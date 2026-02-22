@@ -1094,53 +1094,56 @@ function drawMcCabe(){
   const sl=r.R/(r.R+1),ic=r.xD/(r.R+1),yqPt=sl*r.xF+ic;
   // VLE curve points
   const vlePts=[];for(let i=0;i<=300;i++){const x=i/300;vlePts.push({x,y:vleY(r.l,r.h,r.lk,r.hk,x,r.P,r.model)})}
-  // McCabe stepping — optimal feed stage with proper pinch detection
+  // McCabe stepping — proper construction with pinch zone handling
+  // The key insight: in a pinch zone, the VLE curve and operating line are
+  // very close together, producing many tiny steps that are NOT real theoretical
+  // stages — they are artifacts of the graphical method hitting a zone where
+  // the driving force (y* - y_op) approaches zero. We detect this by measuring
+  // the vertical gap (y_VLE - y_op) relative to the overall driving force.
   const steps=[];let xc=r.xD,yc=r.xD,stages=0;
   const maxStages=200;
   const slStr=(yqPt-r.xW)/(r.xF-r.xW); // stripping line slope
-  let stalled=0; // consecutive iterations with negligible progress
-  let prevXv=r.xD;
-  let usedStripping=false; // once switched to stripping, stay on stripping
+  let usedStripping=false;
+  // Reference driving force: average gap between VLE and diagonal across the range
+  const spanX=r.xD-r.xW;
+  let avgGap=0;for(let i=1;i<20;i++){const xi=r.xW+spanX*i/20;avgGap+=vleY(r.l,r.h,r.lk,r.hk,xi,r.P,r.model)-xi}avgGap/=19;
+  const pinchThreshold=avgGap*0.015; // step height < 1.5% of avg VLE gap = pinch zone
   for(let i=0;i<maxStages;i++){
-    // Find x on VLE curve where y(x)=yc (horizontal step)
-    let lo=0,hi=Math.min(xc+1e-6,1); // search only to the left of current x
+    // Horizontal step: find x on VLE curve where y(x)=yc
+    let lo=0,hi=Math.min(xc+1e-6,1);
     for(let j=0;j<60;j++){const mid=(lo+hi)/2;vleY(r.l,r.h,r.lk,r.hk,mid,r.P,r.model)>yc?hi=mid:lo=mid}
     const xv=(lo+hi)/2;
     steps.push({x1:xc,y1:yc,x2:xv,y2:yc}); // horizontal to VLE
     stages++;
     if(xv<=r.xW+1e-4)break;
-    // Vertical step: choose optimal operating line (wider step = more progress)
+    // Vertical step: choose optimal operating line
     let yop;
-    const yEnr=sl*xv+ic; // enriching line at xv
-    const yStr=r.xW+slStr*(xv-r.xW); // stripping line at xv
+    const yEnr=sl*xv+ic;
+    const yStr=r.xW+slStr*(xv-r.xW);
     if(usedStripping){
-      // Once we've switched to stripping, stay on stripping
       yop=yStr;
     } else if(xv<=r.xF){
-      // Below feed: must use stripping line
       yop=yStr;
       usedStripping=true;
     } else {
-      // Above feed: use whichever operating line gives wider step (lower yop = more progress)
-      // But only switch to stripping if it gives a valid step (yStr < yc)
+      // Optimal feed stage: switch to stripping if it gives a wider step
       if(yStr<yEnr && yStr<yc && yStr>=r.xW){
-        yop=yStr;
-        usedStripping=true;
+        yop=yStr;usedStripping=true;
       } else {
         yop=yEnr;
       }
     }
-    // Clamp yop to valid range
     yop=Math.max(yop,r.xW);
-    // Pinch detection: track stalled progress
-    const progress=prevXv-xv;
-    if(progress<1e-6&&i>2)stalled++;else stalled=0;
-    if(stalled>=3){
-      // Genuinely stuck — separation requires more reflux
+    // Pinch detection: the vertical gap (yc - yop) is the driving force for
+    // this stage. When it becomes negligible, we're in a pinch zone — the
+    // operating line is practically touching the VLE curve.
+    const stepHeight=yc-yop;
+    if(stepHeight<pinchThreshold && i>3){
+      // Pinch zone: don't accumulate micro-stages, just break
       break;
     }
     steps.push({x1:xv,y1:yc,x2:xv,y2:yop}); // vertical to op line
-    prevXv=xv;xc=xv;yc=yop;
+    xc=xv;yc=yop;
     if(xv<=r.xW+1e-4)break;
   }
   mcData={r,sl,ic,yqPt,vlePts,steps,stages};
