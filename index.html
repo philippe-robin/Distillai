@@ -670,6 +670,29 @@ function detectAzeotrope(s1,s2,k1,k2,P,model){
 }
 
 function fenske(a,xD,xW){return Math.log((xD/(1-xD))*((1-xW)/xW))/Math.log(a)}
+// Rigorous Nmin via total reflux stepping on actual VLE curve
+// Returns fractional stage count for use in Gilliland correlation
+// Falls back to classic Fenske if azeotrope prevents convergence
+function fenskeVLE(s1,s2,k1,k2,xD,xW,P,model){
+  const alphaFallback=Math.pow(relAlpha(s1,s2,k1,k2,.1,P,model)*relAlpha(s1,s2,k1,k2,.5,P,model)*relAlpha(s1,s2,k1,k2,.9,P,model),1/3);
+  let xc=xD,n=0,prevX=xD;
+  for(let i=0;i<100;i++){
+    const y=xc;
+    let lo=0,hi=Math.min(xc+1e-6,1);
+    for(let j=0;j<60;j++){const mid=(lo+hi)/2;vleY(s1,s2,k1,k2,mid,P,model)>y?hi=mid:lo=mid}
+    const xv=(lo+hi)/2;
+    n++;
+    // If step doesn't progress (azeotrope or VLE tangent), fall back
+    if(Math.abs(xv-xc)<1e-8||xv>=prevX){return fenske(alphaFallback,xD,xW)}
+    if(xv<=xW){
+      if(xc>xW){const frac=(xc-xW)/(xc-xv);n=n-1+frac;}
+      break;
+    }
+    prevX=xc;xc=xv;
+  }
+  if(n>=100)return fenske(alphaFallback,xD,xW);
+  return n;
+}
 function underwood(a,xF,xD){return Math.max((1/(a-1))*(xD/xF-a*(1-xD)/(1-xF)),.1)}
 function gilliland(Nm,R,Rm){const X=(R-Rm)/(R+1),Y=1-Math.exp((1+54.4*X)/(11+117.2*X)*((X-1)/Math.sqrt(X)));return Math.max((Nm+Y)/(1-Y),Nm+1)}
 
@@ -729,7 +752,10 @@ function doCalc(l,h,lk,hk){
     }
   }
   const MWf=xF*l.mw+(1-xF)*h.mw,rhoF=xF*l.d+(1-xF)*h.d,mF=vF*rhoF,nF=mF/MWf*1000;
-  const alpha=avgAlpha(l,h,lk,hk,P,model),Nmin=fenske(alpha,xD,xW);
+  const alpha=avgAlpha(l,h,lk,hk,P,model);
+  // Use rigorous VLE-based Nmin (total reflux stepping) for consistency with McCabe
+  const NminVLE=fenskeVLE(l,h,lk,hk,xD,xW,P,model);
+  const Nmin=NminVLE;
   // Rmin: VLE-based for all models
   // For q=1 (saturated liquid feed), pinch is at (xF, y*(xF))
   // Rmin = (xD - y*) / (y* - xF)
@@ -971,7 +997,7 @@ s+=txt(P1X+65,CY+CH/2-8,'CHARGE',7,{c:PL,a:'start'});
 s+=txt(P1X+30,P1Y-18,'2"-PL-001',7,{c:GR});
 
 // C-101 Column
-const Np=r.Ntheo||Math.round(r.Nt)||8;
+const Np=Math.ceil(r.Nth)||8;
 s+=column(CX,CY,CW,CH,'C-101','DN'+(r.Dstd*1000).toFixed(0)+' · H='+r.Htot.toFixed(1)+'m',Np);
 // Nozzle labels
 s+=txt(CX-8,CY+15,'N1',7,{c:LG,a:'end'}); // top vapor
@@ -1174,7 +1200,7 @@ function drawMcCabe(){
   const steps=[];let xc=r.xD,yc=r.xD,stages=0;
   const maxStages=200;
   const slStr=(yqPt-r.xW)/(r.xF-r.xW); // stripping line slope
-  let usedStripping=false;
+  let usedStripping=false,reachedBottom=false,pinchBreak=false;
   // Reference driving force: average gap between VLE and diagonal across the range
   const spanX=r.xD-r.xW;
   let avgGap=0;for(let i=1;i<20;i++){const xi=r.xW+spanX*i/20;avgGap+=vleY(r.l,r.h,r.lk,r.hk,xi,r.P,r.model)-xi}avgGap/=19;
@@ -1186,7 +1212,7 @@ function drawMcCabe(){
     const xv=(lo+hi)/2;
     steps.push({x1:xc,y1:yc,x2:xv,y2:yc}); // horizontal to VLE
     stages++;
-    if(xv<=r.xW+1e-4)break;
+    if(xv<=r.xW+1e-4){reachedBottom=true;break}
     // Vertical step: choose optimal operating line
     let yop;
     const yEnr=sl*xv+ic;
@@ -1210,12 +1236,11 @@ function drawMcCabe(){
     // operating line is practically touching the VLE curve.
     const stepHeight=yc-yop;
     if(stepHeight<pinchThreshold && i>3){
-      // Pinch zone: don't accumulate micro-stages, just break
-      break;
+      pinchBreak=true;break;
     }
     steps.push({x1:xv,y1:yc,x2:xv,y2:yop}); // vertical to op line
     xc=xv;yc=yop;
-    if(xv<=r.xW+1e-4)break;
+    if(xv<=r.xW+1e-4){reachedBottom=true;break}
   }
   mcData={r,sl,ic,yqPt,vlePts,steps,stages};
   mcCenter={x:0.5,y:0.5};
@@ -1223,14 +1248,26 @@ function drawMcCabe(){
   document.getElementById('mcZoomLbl').textContent='1×';
   mcRender(0,0,1,1); // full view
   let mcWarn='';
-  const gilN=Math.ceil(r.Nth);
-  if(stages>0 && Math.abs(stages-gilN)/Math.max(gilN,1)>0.3){
-    mcWarn='<div style="color:#f59e0b;font-size:.78rem;margin-top:.3rem">⚠️ Écart McCabe/Gilliland : pinch zone détectée. McCabe ('+stages+') est plus rigoureux pour les systèmes non-idéaux.</div>';
+  const gilN=Math.ceil(r.NthGil||r.Nth);
+  // McCabe-Thiele is rigorous for binary systems; use it as primary Nth
+  // Only update sizing when stepping completed normally (reached xW, not pinch-limited)
+  r.NthGil=r.NthGil||r.Nth; // save Gilliland estimate (only first time)
+  if(reachedBottom && stages>0){
+    r.Nth=stages;
+    r.Nact=Math.ceil(stages/r.eta);
+    r.Hpack=stages*r.hetp;
+    r.Htot=r.Hpack+1.5+1.0;
+    r.dPtot=({structured:.3,random:.5,sieve:.7,valve:.6}[r.intType]||.5)*r.Hpack;
+    showResults(); // refresh results panel with McCabe-based sizing
+  }
+  if(pinchBreak){
+    const azeoNote=r.azeos.length>0?' L\'azéotrope à x='+r.azeos[0].x.toFixed(3)+' limite la séparation.':'';
+    mcWarn='<div style="color:#f59e0b;font-size:.78rem;margin-top:.3rem">⚠️ Pinch détectée à '+stages+' étages — l\'escalier ne peut atteindre xW.'+azeoNote+' Augmenter R/Rmin ou ajuster les spécifications.</div>';
   }
   if(stages>=maxStages){
-    mcWarn='<div style="color:#ef4444;font-size:.78rem;margin-top:.3rem">⚠️ Pinch : la séparation requiert plus de reflux (R/Rmin plus élevé) ou est impossible avec ces spécifications.</div>';
+    mcWarn='<div style="color:#ef4444;font-size:.78rem;margin-top:.3rem">⚠️ >200 étages — séparation impossible avec ces spécifications. Augmenter le reflux.</div>';
   }
-  document.getElementById('mcRes').innerHTML=rc(stages,'Étages McCabe-Thiele','')+rc(gilN,'N Gilliland','')+rc(r.R.toFixed(2),'Reflux R','')+rc(r.Rmin.toFixed(2),'Rmin (VLE)','')+mcWarn;
+  document.getElementById('mcRes').innerHTML=rc(stages,'Étages McCabe-Thiele','')+rc(gilN,'N Gilliland (approx)','')+rc(r.R.toFixed(2),'Reflux R','')+rc(r.Rmin.toFixed(2),'Rmin (VLE)','')+mcWarn;
   if(!mcListenersAttached) setupMcInteraction();
 }
 
@@ -1647,7 +1684,8 @@ function genReport(){const r=R_;
     '<tr><td>Nmin (Fenske)</td><td>'+r.Nmin.toFixed(2)+'</td><td>—</td></tr>'+
     '<tr><td>Rmin (VLE pinch)</td><td>'+r.Rmin.toFixed(3)+'</td><td>—</td></tr>'+
     '<tr><td>R opératoire</td><td>'+r.R.toFixed(3)+'</td><td>—</td></tr>'+
-    '<tr><td>N théoriques (Gilliland)</td><td>'+Math.ceil(r.Nth)+'</td><td>—</td></tr>'+
+    '<tr><td>N théoriques (McCabe-Thiele)</td><td>'+Math.ceil(r.Nth)+'</td><td>—</td></tr>'+
+    (r.NthGil?'<tr><td>N approx. (Gilliland)</td><td>'+Math.ceil(r.NthGil)+'</td><td>—</td></tr>':'')+
     '<tr><td>N réels (η='+r.eta+')</td><td>'+r.Nact+'</td><td>—</td></tr>'+
     '<tr><td>Diamètre</td><td>'+(r.Dstd*1000).toFixed(0)+'</td><td>mm</td></tr>'+
     '<tr><td>Hauteur garnissage</td><td>'+r.Hpack.toFixed(2)+'</td><td>m</td></tr>'+
