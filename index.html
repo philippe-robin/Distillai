@@ -1094,26 +1094,49 @@ function drawMcCabe(){
   const sl=r.R/(r.R+1),ic=r.xD/(r.R+1),yqPt=sl*r.xF+ic;
   // VLE curve points
   const vlePts=[];for(let i=0;i<=300;i++){const x=i/300;vlePts.push({x,y:vleY(r.l,r.h,r.lk,r.hk,x,r.P,r.model)})}
-  // McCabe stepping
+  // McCabe stepping — optimal feed stage with proper pinch detection
   const steps=[];let xc=r.xD,yc=r.xD,stages=0;
   const maxStages=200;
-  let prevXv=r.xD+1; // track progress
+  const slStr=(yqPt-r.xW)/(r.xF-r.xW); // stripping line slope
+  let stalled=0; // consecutive iterations with negligible progress
+  let prevXv=r.xD;
+  let usedStripping=false; // once switched to stripping, stay on stripping
   for(let i=0;i<maxStages;i++){
     // Find x on VLE curve where y(x)=yc (horizontal step)
-    let lo=0,hi=1;
+    let lo=0,hi=Math.min(xc+1e-6,1); // search only to the left of current x
     for(let j=0;j<60;j++){const mid=(lo+hi)/2;vleY(r.l,r.h,r.lk,r.hk,mid,r.P,r.model)>yc?hi=mid:lo=mid}
     const xv=(lo+hi)/2;
     steps.push({x1:xc,y1:yc,x2:xv,y2:yc}); // horizontal to VLE
     stages++;
     if(xv<=r.xW+1e-4)break;
-    // Vertical step down to operating line
+    // Vertical step: choose optimal operating line (wider step = more progress)
     let yop;
-    if(xv>=r.xF){yop=sl*xv+ic}
-    else{const slStr=(yqPt-r.xW)/(r.xF-r.xW);yop=r.xW+slStr*(xv-r.xW)}
-    // Pinch detection: insufficient progress toward xW
+    const yEnr=sl*xv+ic; // enriching line at xv
+    const yStr=r.xW+slStr*(xv-r.xW); // stripping line at xv
+    if(usedStripping){
+      // Once we've switched to stripping, stay on stripping
+      yop=yStr;
+    } else if(xv<=r.xF){
+      // Below feed: must use stripping line
+      yop=yStr;
+      usedStripping=true;
+    } else {
+      // Above feed: use whichever operating line gives wider step (lower yop = more progress)
+      // But only switch to stripping if it gives a valid step (yStr < yc)
+      if(yStr<yEnr && yStr<yc && yStr>=r.xW){
+        yop=yStr;
+        usedStripping=true;
+      } else {
+        yop=yEnr;
+      }
+    }
+    // Clamp yop to valid range
+    yop=Math.max(yop,r.xW);
+    // Pinch detection: track stalled progress
     const progress=prevXv-xv;
-    if(progress<1e-4*(r.xD-r.xW) && i>5){
-      // Stuck in pinch zone — the separation requires more reflux
+    if(progress<1e-6&&i>2)stalled++;else stalled=0;
+    if(stalled>=3){
+      // Genuinely stuck — separation requires more reflux
       break;
     }
     steps.push({x1:xv,y1:yc,x2:xv,y2:yop}); // vertical to op line
