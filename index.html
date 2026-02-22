@@ -1247,27 +1247,27 @@ function drawMcCabe(){
   document.getElementById('mcZoomSlider').value=1;
   document.getElementById('mcZoomLbl').textContent='1×';
   mcRender(0,0,1,1); // full view
-  let mcWarn='';
-  const gilN=Math.ceil(r.NthGil||r.Nth);
-  // McCabe-Thiele is rigorous for binary systems; use it as primary Nth
-  // Only update sizing when stepping completed normally (reached xW, not pinch-limited)
-  r.NthGil=r.NthGil||r.Nth; // save Gilliland estimate (only first time)
+  let mcWarn='',mcMethod='';
+  // Single Nth: McCabe when completed, Gilliland as fallback
   if(reachedBottom && stages>0){
     r.Nth=stages;
     r.Nact=Math.ceil(stages/r.eta);
     r.Hpack=stages*r.hetp;
     r.Htot=r.Hpack+1.5+1.0;
     r.dPtot=({structured:.3,random:.5,sieve:.7,valve:.6}[r.intType]||.5)*r.Hpack;
-    showResults(); // refresh results panel with McCabe-based sizing
+    mcMethod='McCabe-Thiele';
+    showResults();
+  } else {
+    mcMethod='Gilliland';
   }
   if(pinchBreak){
     const azeoNote=r.azeos.length>0?' L\'azéotrope à x='+r.azeos[0].x.toFixed(3)+' limite la séparation.':'';
-    mcWarn='<div style="color:#f59e0b;font-size:.78rem;margin-top:.3rem">⚠️ Pinch détectée à '+stages+' étages — l\'escalier ne peut atteindre xW.'+azeoNote+' Augmenter R/Rmin ou ajuster les spécifications.</div>';
+    mcWarn='<div style="color:#f59e0b;font-size:.78rem;margin-top:.3rem">⚠️ Pinch détectée à '+stages+' étages — l\'escalier ne peut atteindre xW.'+azeoNote+' Dimensionnement basé sur Gilliland ('+Math.ceil(r.Nth)+' plateaux).</div>';
   }
   if(stages>=maxStages){
     mcWarn='<div style="color:#ef4444;font-size:.78rem;margin-top:.3rem">⚠️ >200 étages — séparation impossible avec ces spécifications. Augmenter le reflux.</div>';
   }
-  document.getElementById('mcRes').innerHTML=rc(stages,'Étages McCabe-Thiele','')+rc(gilN,'N Gilliland (approx)','')+rc(r.R.toFixed(2),'Reflux R','')+rc(r.Rmin.toFixed(2),'Rmin (VLE)','')+mcWarn;
+  document.getElementById('mcRes').innerHTML=rc(Math.ceil(r.Nth),'N théoriques ('+mcMethod+')','')+rc(stages,'Étages McCabe','')+rc(r.R.toFixed(2),'Reflux R','')+rc(r.Rmin.toFixed(2),'Rmin','')+mcWarn;
   if(!mcListenersAttached) setupMcInteraction();
 }
 
@@ -1684,8 +1684,7 @@ function genReport(){const r=R_;
     '<tr><td>Nmin (Fenske)</td><td>'+r.Nmin.toFixed(2)+'</td><td>—</td></tr>'+
     '<tr><td>Rmin (VLE pinch)</td><td>'+r.Rmin.toFixed(3)+'</td><td>—</td></tr>'+
     '<tr><td>R opératoire</td><td>'+r.R.toFixed(3)+'</td><td>—</td></tr>'+
-    '<tr><td>N théoriques (McCabe-Thiele)</td><td>'+Math.ceil(r.Nth)+'</td><td>—</td></tr>'+
-    (r.NthGil?'<tr><td>N approx. (Gilliland)</td><td>'+Math.ceil(r.NthGil)+'</td><td>—</td></tr>':'')+
+    '<tr><td>N théoriques</td><td>'+Math.ceil(r.Nth)+'</td><td>—</td></tr>'+
     '<tr><td>N réels (η='+r.eta+')</td><td>'+r.Nact+'</td><td>—</td></tr>'+
     '<tr><td>Diamètre</td><td>'+(r.Dstd*1000).toFixed(0)+'</td><td>mm</td></tr>'+
     '<tr><td>Hauteur garnissage</td><td>'+r.Hpack.toFixed(2)+'</td><td>m</td></tr>'+
