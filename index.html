@@ -1392,170 +1392,236 @@ function drawAnim(pct){
   if(!R_){document.getElementById('aSvg').innerHTML='<text x="600" y="390" text-anchor="middle" font-family="Arial,sans-serif" font-size="16" fill="#888">Lancez un calcul pour afficher l\u2019animation PFD</text>';return;}
   const r=R_,idx=Math.min(Math.round(pct/100*(r.sim.length-1)),r.sim.length-1),d=r.sim[idx];
   document.getElementById('tDisp').textContent='t = '+d.t.toFixed(0)+' min';
-  const svg=document.getElementById('aSvg');
-  const prog=pct/100,lvl=Math.max(.05,1-prog);
-  const BK='#1a1a1a',GR='#555',LG='#888';
+  const svg=document.getElementById('aSvg'),prog=pct/100,lvl=Math.max(.05,1-prog);
+  const BK='#263238',GR='#546e7a',LG='#90a4ae',WH='#fff';
   const Tmin=r.l.tb||60,Tmax=r.h.tb||100;
   const Tfrac=Math.max(0,Math.min(1,(d.Tb-Tmin)/(Tmax-Tmin+20)));
-  const liqClr=Tfrac<.35?'#1976d2':Tfrac<.6?'#e65100':'#c62828';
-  const vapClr='#7b1fa2';
-  function tx(x,y,str,sz,o){o=o||{};return'<text x="'+x+'" y="'+y+'" font-family="Arial,sans-serif" font-size="'+sz+'" fill="'+(o.c||BK)+'" text-anchor="'+(o.a||'middle')+'" '+(o.b?'font-weight="bold"':'')+'>'+str+'</text>';}
-  function ln(x1,y1,x2,y2,c,w,o){return'<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+c+'" stroke-width="'+w+'" '+(o||'')+'/>';}
-  function animDash(pts,c,w,dur,rev){var v=rev?'0;18':'0;-18';return'<polyline points="'+pts+'" fill="none" stroke="'+c+'" stroke-width="'+w+'" stroke-dasharray="12,6"><animate attributeName="stroke-dashoffset" dur="'+dur+'s" repeatCount="indefinite" values="'+v+'"/></polyline>';}
-  function eqTag(x,y,tag,desc){var tw=Math.max(tag.length,desc.length)*6.5+14;return'<rect x="'+(x-tw/2)+'" y="'+y+'" width="'+tw+'" height="30" rx="2" fill="#fff" stroke="'+BK+'" stroke-width="1.2"/>'+ln(x-tw/2,y+15,x+tw/2,y+15,BK,.5)+tx(x,y+11,tag,9,{b:true})+tx(x,y+25,desc,7,{c:GR});}
-  function streamTag(x,y,num,data,c){return'<circle cx="'+x+'" cy="'+y+'" r="11" fill="#fff" stroke="'+(c||BK)+'" stroke-width="1.5"/>'+tx(x,y+4,num,9,{b:true,c:c||BK})+'<rect x="'+(x+14)+'" y="'+(y-11)+'" width="'+(data.length*5.8+10)+'" height="22" rx="3" fill="#fff" stroke="#ccc" stroke-width=".8"/>'+tx(x+14+data.length*2.9+5,y+4,data,8,{c:GR});}
-  function tempDisp(x,y,T,label,c){return'<rect x="'+x+'" y="'+y+'" width="70" height="38" rx="4" fill="#fff" stroke="'+c+'" stroke-width="1.2"/>'+tx(x+35,y+14,label,7,{c:GR})+tx(x+35,y+30,T.toFixed(1)+'\u00b0C',11,{c:c,b:true});}
-  function compDisp(x,y,val,label,c){return'<rect x="'+x+'" y="'+y+'" width="72" height="38" rx="4" fill="#fff" stroke="'+(c||'#666')+'" stroke-width="1"/>'+tx(x+36,y+14,label,7,{c:GR})+tx(x+36,y+30,val,10,{c:c||BK,b:true});}
+  // Dynamic liquid color: cool blue → warm orange → hot red
+  const lR=Math.round(25+200*Tfrac),lG=Math.round(118-60*Tfrac),lB=Math.round(210-180*Tfrac);
+  const liqClr='rgb('+lR+','+lG+','+lB+')';
+  const liqDk='rgb('+Math.round(lR*.7)+','+Math.round(lG*.7)+','+Math.round(lB*.7)+')';
+  const vapClr='#7c4dff',vapLt='#b388ff',stmClr='#e53935',cwClr='#00897b',dstClr='#2e7d32',rfxClr='#e65100',resClr='#6d4c41';
+  // Helpers
+  function tx(x,y,str,sz,o){o=o||{};return'<text x="'+x+'" y="'+y+'" font-family="Inter,Arial,sans-serif" font-size="'+sz+'" fill="'+(o.c||BK)+'" text-anchor="'+(o.a||'middle')+'"'+(o.b?' font-weight="600"':'')+(o.o?' opacity="'+o.o+'"':'')+'>'+str+'</text>';}
+  function ln(x1,y1,x2,y2,c,w,o){return'<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+c+'" stroke-width="'+w+'"'+(o?' '+o:'')+'/>';}
+  function pl(pts,c,w,o){return'<polyline points="'+pts+'" fill="none" stroke="'+c+'" stroke-width="'+w+'" stroke-linejoin="round" stroke-linecap="round"'+(o?' '+o:'')+'/>';}
+  function aFlow(pts,c,w,dur,rev){var v=rev?'0;20':'0;-20';return'<polyline points="'+pts+'" fill="none" stroke="'+c+'" stroke-width="'+w+'" stroke-dasharray="14,7" stroke-linecap="round" stroke-linejoin="round" opacity=".85"><animate attributeName="stroke-dashoffset" dur="'+dur+'s" repeatCount="indefinite" values="'+v+'"/></polyline>';}
+  function pill(x,y,w,h,c,sw){return'<rect x="'+x+'" y="'+y+'" width="'+w+'" height="'+h+'" rx="'+(h/2)+'" fill="'+WH+'" stroke="'+(c||BK)+'" stroke-width="'+(sw||1.5)+'"/>';}
+  // Equipment tag (badge ISA style)
+  function eqBadge(x,y,tag,desc){var tw=Math.max(tag.length*7.5,desc.length*6)+16;return'<rect x="'+(x-tw/2)+'" y="'+y+'" width="'+tw+'" height="32" rx="4" fill="'+WH+'" stroke="'+BK+'" stroke-width="1.5" filter="url(#sh)"/>'+ln(x-tw/2,y+16,x+tw/2,y+16,LG,.6)+tx(x,y+12,tag,9.5,{b:true})+tx(x,y+26,desc,7,{c:GR});}
+  // Metric box (inline digital display style)
+  function mBox(x,y,label,val,unit,c){return'<rect x="'+x+'" y="'+y+'" width="88" height="40" rx="5" fill="'+WH+'" stroke="'+(c||'#78909c')+'" stroke-width="1.2" filter="url(#sh)"/>'+tx(x+44,y+14,label,7,{c:GR})+tx(x+44,y+32,val+(unit||''),11,{c:c||BK,b:true});}
+  // Stream number bubble
+  function sNum(x,y,n,c){return'<circle cx="'+x+'" cy="'+y+'" r="10" fill="'+WH+'" stroke="'+(c||BK)+'" stroke-width="1.4"/>'+tx(x,y+4,n,9,{b:true,c:c||BK});}
+  // 3D vessel shadow helper
+  function vShadow(x,y,w,h){return'<rect x="'+(x+3)+'" y="'+(y+3)+'" width="'+w+'" height="'+h+'" rx="6" fill="#000" opacity=".08"/>';}
 
+  // ========= DEFS (gradients, filters, markers) =========
   var s='<defs>'+
-  '<marker id="aw" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="'+BK+'"/></marker>'+
-  '<marker id="awV" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="'+vapClr+'"/></marker>'+
-  '<marker id="awU" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#888"/></marker>'+
-  '<linearGradient id="aLiq" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="'+liqClr+'" stop-opacity=".55"/><stop offset="100%" stop-color="'+liqClr+'" stop-opacity=".18"/></linearGradient>'+
-  '<linearGradient id="aDst" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#2e7d32" stop-opacity=".4"/><stop offset="100%" stop-color="#2e7d32" stop-opacity=".12"/></linearGradient>'+
+  '<filter id="sh" x="-4%" y="-4%" width="110%" height="115%"><feDropShadow dx="1.5" dy="1.5" stdDeviation="2" flood-opacity=".12"/></filter>'+
+  '<filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>'+
+  '<linearGradient id="gMetal" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#e0e0e0"/><stop offset="30%" stop-color="#f5f5f5"/><stop offset="70%" stop-color="#fafafa"/><stop offset="100%" stop-color="#e0e0e0"/></linearGradient>'+
+  '<linearGradient id="gMetalV" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#e0e0e0"/><stop offset="30%" stop-color="#f5f5f5"/><stop offset="70%" stop-color="#fafafa"/><stop offset="100%" stop-color="#e0e0e0"/></linearGradient>'+
+  '<linearGradient id="gLiq" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+liqClr+'" stop-opacity=".25"/><stop offset="100%" stop-color="'+liqClr+'" stop-opacity=".65"/></linearGradient>'+
+  '<linearGradient id="gDst" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="'+dstClr+'" stop-opacity=".15"/><stop offset="100%" stop-color="'+dstClr+'" stop-opacity=".5"/></linearGradient>'+
+  '<linearGradient id="gCol" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#cfd8dc"/><stop offset="15%" stop-color="#eceff1"/><stop offset="50%" stop-color="#fafafa"/><stop offset="85%" stop-color="#eceff1"/><stop offset="100%" stop-color="#cfd8dc"/></linearGradient>'+
+  '<linearGradient id="gVap" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="'+vapClr+'" stop-opacity=".08"/><stop offset="100%" stop-color="'+vapClr+'" stop-opacity=".25"/></linearGradient>'+
+  '<radialGradient id="gHX" cx=".35" cy=".35"><stop offset="0%" stop-color="#fafafa"/><stop offset="100%" stop-color="#cfd8dc"/></radialGradient>'+
+  '<marker id="aw" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><polygon points="0 0,8 3,0 6" fill="'+BK+'"/></marker>'+
   '</defs>';
 
-  s+='<rect x="3" y="3" width="1194" height="774" fill="#fafafa" stroke="#999" stroke-width="1.5" rx="2"/>';
-  s+='<rect x="3" y="722" width="1194" height="55" fill="#f0f0f0" stroke="#999" stroke-width="1"/>';
-  s+=ln(620,722,620,777,'#999',1)+ln(960,722,960,777,'#999',1);
-  s+=tx(310,740,'PFD \u2014 DISTILLATION BATCH',13,{b:true});
-  s+=tx(310,754,r.l.n+' / '+r.h.n+' \u2014 '+r.model.toUpperCase()+' \u2014 '+(r.P/1000).toFixed(2)+' bar',9,{c:GR});
-  var pcClr=prog<.85?'#2e7d32':prog<.95?'#e65100':'#c62828';
-  s+=tx(310,767,'t = '+d.t.toFixed(0)+' min  \u00b7  '+(prog*100).toFixed(1)+'%'+(d.xs>r.xW+.005?' \u2014 En cours':' \u2014 Termin\u00e9'),9,{c:pcClr});
-  s+=tx(790,740,'DistillAI v2',10,{b:true})+tx(790,754,'ISO 10628',8,{c:GR});
-  s+=tx(1080,740,'R\u00e9v. 0',9,{b:true})+tx(1080,754,new Date().toLocaleDateString('fr-FR'),8,{c:GR});
+  // ========= BACKGROUND =========
+  s+='<rect width="1200" height="780" fill="#f8f9fa" rx="3"/>';
 
-  var bx=120,by=400,bw=220,bh=200;
-  var cx2=200,cy2=62,cw2=80,ch2=320;
-  var condX=630,condY=52;
-  var drX=610,drY=185,drW=120,drH=50;
-  var t2X=920,t2Y=130,t2W=110,t2H=140;
-  var t3X=500,t3Y=590,t3W=95,t3H=75;
+  // ========= LAYOUT =========
+  var CX=195,CY=50,CW=80,CH=350; // Column
+  var BX=80,BY=470,BW=240,BH=180;// Reboiler (kettle)
+  var EX=560,EY=35;                // Condenser center
+  var DX=540,DY=170,DW=130,DH=48; // Reflux drum
+  var TX=860,TY=100,TW=120,TH=160;// Distillate tank
+  var RX=430,RY=610,RW=100,RH=80; // Residue tank
+  var nP=Math.min(r.Nact||8,14),trSp=(CH-40)/nP;
+  var feedY=CY+CH*.55;
+  var teeX=DX+DW+45,teeY=DY+DH/2;
+  var rfxY=CY+35;
 
-  // E-101
-  s+='<rect x="'+bx+'" y="'+by+'" width="'+bw+'" height="'+bh+'" rx="5" fill="#fff" stroke="'+BK+'" stroke-width="2"/>';
-  var liqH2=bh*lvl,liqY=by+bh-liqH2;
-  s+='<rect x="'+(bx+2)+'" y="'+liqY+'" width="'+(bw-4)+'" height="'+(Math.max(0,liqH2-2))+'" fill="url(#aLiq)"/>';
-  if(prog<.95){
-    var wave='M'+(bx+2)+','+liqY;
-    for(var wx=0;wx<=bw-4;wx+=3){wave+=' L'+(bx+2+wx)+','+(liqY+Math.sin(wx*.05+Date.now()/600)*2);}
-    wave+=' L'+(bx+bw-2)+','+(liqY+5)+' L'+(bx+2)+','+(liqY+5)+' Z';
-    s+='<path d="'+wave+'" fill="'+liqClr+'" opacity=".18"/>';
-    for(var i=0;i<5;i++){
-      var bub_x=bx+30+Math.random()*(bw-60),bub_r=(1.5+Math.random()*2).toFixed(1);
-      var dur2=(1.5+Math.random()*2).toFixed(1);
-      s+='<circle cx="'+bub_x+'" cy="'+(by+bh-10)+'" r="'+bub_r+'" fill="none" stroke="'+liqClr+'" stroke-width=".6" opacity=".5"><animate attributeName="cy" dur="'+dur2+'s" repeatCount="indefinite" values="'+(by+bh-10)+';'+(liqY+5)+';'+(by+bh-10)+'"/><animate attributeName="opacity" dur="'+dur2+'s" repeatCount="indefinite" values=".5;0;.5"/></circle>';
-    }
-  }
-  s+=eqTag(bx+bw/2,by-36,'E-101','Bouilleur');
-  s+=tx(bx+bw/2,liqY>by+30?by+30:liqY+22,'x = '+d.xs.toFixed(4),12,{b:true,c:liqClr});
-  s+=tempDisp(bx-82,by+bh/2-19,d.Tb,'T bouilleur',liqClr);
-  s+='<rect x="'+(bx+40)+'" y="'+(by+bh+8)+'" width="'+(bw-80)+'" height="22" rx="4" fill="#fff" stroke="#c62828" stroke-width="1"/>';
-  s+=tx(bx+bw/2,by+bh+23,'Q = '+d.Qr.toFixed(1)+' kW',9,{c:'#c62828',b:true});
-  s+=animDash((bx)+','+(by+bh-40)+' '+(bx-40)+','+(by+bh-40),'#c62828',1.5,1.5,true);
-  s+=tx(bx-45,by+bh-46,'Vapeur '+(r.stT||120)+'\u00b0C',7,{c:'#c62828',a:'end'});
-  s+='<line x1="'+(bx+bw)+'" y1="'+(by+bh-40)+'" x2="'+(bx+bw+35)+'" y2="'+(by+bh-40)+'" stroke="#888" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#awU)"/>';
-  s+=tx(bx+bw+40,by+bh-35,'Condensat',7,{c:LG,a:'start'});
-
-  // C-101
-  s+='<rect x="'+cx2+'" y="'+cy2+'" width="'+cw2+'" height="'+ch2+'" rx="5" fill="#fff" stroke="'+BK+'" stroke-width="2.5"/>';
-  s+='<path d="M'+cx2+','+(cy2+5)+' Q'+(cx2+cw2/2)+','+(cy2-10)+' '+(cx2+cw2)+','+(cy2+5)+'" fill="none" stroke="'+BK+'" stroke-width="2.5"/>';
-  s+='<path d="M'+cx2+','+(cy2+ch2-5)+' Q'+(cx2+cw2/2)+','+(cy2+ch2+10)+' '+(cx2+cw2)+','+(cy2+ch2-5)+'" fill="none" stroke="'+BK+'" stroke-width="2.5"/>';
-  var nP=Math.min(r.Nact||8,14),trSp=(ch2-30)/nP;
-  for(var j=0;j<nP;j++){
-    var py=cy2+18+j*trSp;
-    s+=ln(cx2+6,py,cx2+cw2-6,py,'#bbb',.8);
-    s+=ln(cx2+cw2-14,py,cx2+cw2-14,py-trSp*.35,'#bbb',.8);
-    if(prog<.95){
-      var tf=Math.max(0.1,(1-j/nP)*.5);
-      s+='<rect x="'+(cx2+7)+'" y="'+(py-2.5)+'" width="'+((cw2-14)*tf)+'" height="2" rx="1" fill="'+liqClr+'" opacity=".2"/>';
-    }
-  }
-  s+=eqTag(cx2+cw2/2,cy2-42,'C-101',nP+' plateaux');
-  s+=tx(cx2+cw2/2,cy2-55,'DN'+((r.Dstd||0.1)*1000).toFixed(0)+' \u00b7 H='+(r.Htot||1).toFixed(1)+'m',8,{c:LG});
-  var feedY=cy2+ch2*.55;
-  s+=animDash((cx2-45)+','+feedY+' '+cx2+','+feedY,'#1976d2',2.5,2);
-  s+=tx(cx2-50,feedY-7,'Charge',8,{c:'#1976d2',a:'end'});
-
-  // Vapor line
-  var vapPts=(cx2+cw2)+','+(cy2+15)+' '+(cx2+cw2+28)+','+(cy2+15)+' '+(cx2+cw2+28)+','+(condY+25)+' '+(condX-55)+','+(condY+25);
-  s+=animDash(vapPts,vapClr,2.5,1.5);
-  s+=streamTag(cx2+cw2+28+85,condY+25,'1','y='+d.yv.toFixed(3),vapClr);
-  s+=animDash((bx+bw/2)+','+by+' '+(cx2+cw2/2)+','+(cy2+ch2),vapClr,2,1.2);
-
-  // E-102
-  s+='<ellipse cx="'+condX+'" cy="'+(condY+25)+'" rx="50" ry="25" fill="#fff" stroke="'+BK+'" stroke-width="2"/>';
-  s+=ln(condX-12,condY+3,condX-12,condY+47,'#999',1)+ln(condX+12,condY+3,condX+12,condY+47,'#999',1);
-  s+=eqTag(condX,condY-16,'E-102','Condenseur');
-  s+='<rect x="'+(condX-35)+'" y="'+(condY+56)+'" width="70" height="20" rx="3" fill="#fff" stroke="#2e7d32" stroke-width="1"/>';
-  s+=tx(condX,condY+69,'Q='+d.Qc.toFixed(1)+' kW',8,{c:'#2e7d32',b:true});
-  s+='<line x1="'+(condX+50)+'" y1="'+(condY+10)+'" x2="'+(condX+82)+'" y2="'+(condY+10)+'" stroke="#2e7d32" stroke-width="1.5" stroke-dasharray="6,3"/>';
-  s+='<line x1="'+(condX+50)+'" y1="'+(condY+40)+'" x2="'+(condX+82)+'" y2="'+(condY+40)+'" stroke="#2e7d32" stroke-width="1.5" stroke-dasharray="6,3"/>';
-  s+=tx(condX+87,condY+14,'CW in',7,{c:'#2e7d32',a:'start'})+tx(condX+87,condY+44,'CW out',7,{c:'#2e7d32',a:'start'});
-  s+=tempDisp(condX+87,condY+56,d.Tt,'T distillat','#1976d2');
-  s+=animDash(condX+','+(condY+50)+' '+condX+','+drY+' '+(drX+drW/2)+','+drY,BK,2,1.5);
-
-  // D-101
-  var rr2=drH/2;
-  s+='<path d="M'+(drX+rr2)+','+drY+' L'+(drX+drW-rr2)+','+drY+' Q'+(drX+drW)+','+drY+' '+(drX+drW)+','+(drY+rr2)+' Q'+(drX+drW)+','+(drY+drH)+' '+(drX+drW-rr2)+','+(drY+drH)+' L'+(drX+rr2)+','+(drY+drH)+' Q'+drX+','+(drY+drH)+' '+drX+','+(drY+rr2)+' Q'+drX+','+drY+' '+(drX+rr2)+','+drY+' Z" fill="#fff" stroke="'+BK+'" stroke-width="2"/>';
-  s+='<rect x="'+(drX+4)+'" y="'+(drY+drH*.4)+'" width="'+(drW-8)+'" height="'+(drH*.55)+'" rx="2" fill="#2e7d32" opacity=".12"/>';
-  s+=eqTag(drX+drW/2,drY-32,'D-101','Ballon reflux');
-
-  // Tee + reflux + distillate
-  var teeX=drX+drW+40,teeY=drY+drH/2;
-  s+='<line x1="'+(drX+drW)+'" y1="'+teeY+'" x2="'+teeX+'" y2="'+teeY+'" stroke="'+BK+'" stroke-width="2.5"/>';
+  // ========= PROCESS FLOW LINES (behind everything) =========
+  // Feed line (blue)
+  s+=aFlow('60,'+feedY+' '+CX+','+feedY,'#1976d2',2.5,2);
+  // Column bottom → reboiler (vapor return)
+  s+=aFlow((CX+CW/2)+','+(CY+CH+8)+' '+(BX+BW/2)+','+BY,vapClr,2,1.2);
+  // Reboiler vapor → column bottom
+  s+=aFlow((BX+BW/2)+','+BY+' '+(CX+CW/2)+','+(CY+CH),vapClr,2,1.2,true);
+  // Vapor overhead: column top → condenser
+  s+=aFlow((CX+CW)+','+(CY+20)+' '+(CX+CW+40)+','+(CY+20)+' '+(CX+CW+40)+','+(EY+25)+' '+(EX-55)+','+(EY+25),vapClr,2.5,1.5);
+  // Condensate: condenser → drum
+  s+=aFlow(EX+','+(EY+50)+' '+EX+','+(DY)+' '+(DX+DW/2)+','+DY,BK,2,1.8);
+  // Drum → tee
+  s+=pl((DX+DW)+','+teeY+' '+teeX+','+teeY,BK,2.5);
   s+='<circle cx="'+teeX+'" cy="'+teeY+'" r="3.5" fill="'+BK+'"/>';
-  s+=animDash(teeX+','+teeY+' '+teeX+','+(cy2+30)+' '+(cx2+cw2)+','+(cy2+30),'#e65100',2,2,true);
-  s+='<rect x="'+(teeX+6)+'" y="'+(cy2+50)+'" width="80" height="24" rx="4" fill="#fff3e0" stroke="#e65100" stroke-width="1"/>';
-  s+=tx(teeX+46,cy2+66,'R = '+d.Ra.toFixed(2),10,{c:'#e65100',b:true});
-  s+=animDash(teeX+','+teeY+' '+(t2X+t2W/2)+','+teeY+' '+(t2X+t2W/2)+','+(t2Y+10),'#2e7d32',2,2.5);
-  s+=streamTag((teeX+t2X+t2W/2)/2,teeY-20,'3','D='+d.Dr.toFixed(1)+' kg/h','#2e7d32');
+  // Reflux: tee → column top
+  s+=aFlow(teeX+','+teeY+' '+teeX+','+rfxY+' '+(CX+CW+1)+','+rfxY,rfxClr,2,2,true);
+  // Distillate: tee → tank
+  s+=aFlow(teeX+','+teeY+' '+(TX+TW/2)+','+teeY+' '+(TX+TW/2)+','+(TY+5),dstClr,2,2.5);
+  // Residue: reboiler → tank
+  s+=aFlow((BX+BW)+','+(BY+BH/2)+' '+(BX+BW+40)+','+(BY+BH/2)+' '+(BX+BW+40)+','+(RY+RH/2)+' '+RX+','+(RY+RH/2),resClr,1.5,3);
+  // Steam in (dashed utility)
+  s+='<line x1="'+(BX-10)+'" y1="'+(BY+BH-35)+'" x2="'+BX+'" y2="'+(BY+BH-35)+'" stroke="'+stmClr+'" stroke-width="1.8" stroke-dasharray="6,3"/>';
+  // Condensate out
+  s+='<line x1="'+(BX+BW)+'" y1="'+(BY+BH-35)+'" x2="'+(BX+BW+25)+'" y2="'+(BY+BH-35)+'" stroke="'+LG+'" stroke-width="1.5" stroke-dasharray="6,3"/>';
+  // CW lines
+  s+='<line x1="'+(EX+55)+'" y1="'+(EY+12)+'" x2="'+(EX+82)+'" y2="'+(EY+12)+'" stroke="'+cwClr+'" stroke-width="1.5" stroke-dasharray="6,3"/>';
+  s+='<line x1="'+(EX+55)+'" y1="'+(EY+38)+'" x2="'+(EX+82)+'" y2="'+(EY+38)+'" stroke="'+cwClr+'" stroke-width="1.5" stroke-dasharray="6,3"/>';
 
-  // T-102
-  s+='<path d="M'+t2X+','+(t2Y+t2H)+' L'+t2X+','+(t2Y+14)+' Q'+t2X+','+t2Y+' '+(t2X+t2W/2)+','+t2Y+' Q'+(t2X+t2W)+','+t2Y+' '+(t2X+t2W)+','+(t2Y+14)+' L'+(t2X+t2W)+','+(t2Y+t2H)+' Z" fill="#fff" stroke="'+BK+'" stroke-width="2"/>';
-  var dLvl2=Math.min(prog,.95),dLH=t2H*dLvl2*.85;
-  s+='<rect x="'+(t2X+3)+'" y="'+(t2Y+t2H-dLH)+'" width="'+(t2W-6)+'" height="'+dLH+'" fill="url(#aDst)"/>';
-  s+=eqTag(t2X+t2W/2,t2Y-34,'T-102','Bac distillat');
-  s+=tx(t2X+t2W/2,t2Y+t2H-8,d.Dv.toFixed(1)+' L',12,{c:'#2e7d32',b:true});
-  s+=compDisp(t2X+t2W+10,t2Y+45,'xD='+d.xDi.toFixed(3),'Distillat','#2e7d32');
+  // ========= COLUMN C-101 (3D metallic look) =========
+  s+=vShadow(CX,CY,CW,CH);
+  s+='<rect x="'+CX+'" y="'+CY+'" width="'+CW+'" height="'+CH+'" rx="6" fill="url(#gCol)" stroke="'+BK+'" stroke-width="2" filter="url(#sh)"/>';
+  // Top & bottom dished heads
+  s+='<path d="M'+CX+','+(CY+6)+' Q'+(CX+CW/2)+','+(CY-10)+' '+(CX+CW)+','+(CY+6)+'" fill="none" stroke="'+BK+'" stroke-width="2"/>';
+  s+='<path d="M'+CX+','+(CY+CH-6)+' Q'+(CX+CW/2)+','+(CY+CH+10)+' '+(CX+CW)+','+(CY+CH-6)+'" fill="none" stroke="'+BK+'" stroke-width="2"/>';
+  // Vapor space gradient at top
+  s+='<rect x="'+(CX+3)+'" y="'+(CY+8)+'" width="'+(CW-6)+'" height="'+(CH*.15)+'" rx="3" fill="url(#gVap)" opacity=".6"/>';
+  // Trays with liquid holdup
+  for(var j=0;j<nP;j++){
+    var py=CY+25+j*trSp;
+    s+=ln(CX+5,py,CX+CW-5,py,'#b0bec5',1);
+    s+=ln(CX+CW-15,py,CX+CW-15,py-trSp*.3,'#b0bec5',.7);
+    if(prog<.97){
+      var holdup=Math.max(0.08,(1-j/nP)*.45);
+      s+='<rect x="'+(CX+6)+'" y="'+(py-3)+'" width="'+((CW-12)*holdup)+'" height="3" rx="1.5" fill="'+liqClr+'" opacity=".35"/>';
+    }
+  }
+  // Column highlight stripe (3D effect)
+  s+='<rect x="'+(CX+CW*.65)+'" y="'+(CY+10)+'" width="4" height="'+(CH-20)+'" rx="2" fill="'+WH+'" opacity=".25"/>';
+  s+=eqBadge(CX+CW/2,CY-44,'C-101',nP+' plateaux');
+  s+=tx(CX+CW/2,CY-56,'DN'+((r.Dstd||.1)*1000).toFixed(0)+' · H='+(r.Htot||1).toFixed(1)+'m',7.5,{c:LG});
+  // Feed nozzle
+  s+='<rect x="'+(CX-8)+'" y="'+(feedY-5)+'" width="10" height="10" rx="2" fill="url(#gMetal)" stroke="'+BK+'" stroke-width="1.2"/>';
+  s+=tx(CX-16,feedY-10,'Charge',7.5,{c:'#1976d2',a:'end'});
 
-  // T-103
-  s+=animDash((bx+bw)+','+(by+bh/2)+' '+(bx+bw+50)+','+(by+bh/2)+' '+(bx+bw+50)+','+(t3Y+t3H/2)+' '+t3X+','+(t3Y+t3H/2),'#795548',1.5,3);
-  s+='<rect x="'+t3X+'" y="'+t3Y+'" width="'+t3W+'" height="'+t3H+'" rx="4" fill="#fff" stroke="'+BK+'" stroke-width="2"/>';
-  s+=eqTag(t3X+t3W/2,t3Y-32,'T-103','R\u00e9sidu');
+  // ========= REBOILER E-101 (kettle style) =========
+  s+=vShadow(BX,BY,BW,BH);
+  s+='<rect x="'+BX+'" y="'+BY+'" width="'+BW+'" height="'+BH+'" rx="12" fill="url(#gMetal)" stroke="'+BK+'" stroke-width="2" filter="url(#sh)"/>';
+  // Liquid fill
+  var liqH=BH*lvl,liqY=BY+BH-liqH;
+  s+='<rect x="'+(BX+3)+'" y="'+liqY+'" width="'+(BW-6)+'" height="'+Math.max(0,liqH-14)+'" rx="9" fill="url(#gLiq)"/>';
+  // Wave surface
+  if(prog<.97){
+    var wv='M'+(BX+4)+','+liqY;
+    for(var wx=0;wx<=BW-8;wx+=4){wv+=' L'+(BX+4+wx)+','+(liqY+Math.sin(wx*.04+Date.now()/500)*2.5);}
+    wv+=' L'+(BX+BW-4)+','+(liqY+6)+' L'+(BX+4)+','+(liqY+6)+' Z';
+    s+='<path d="'+wv+'" fill="'+liqClr+'" opacity=".2"/>';
+    // Bubbles
+    for(var i=0;i<6;i++){
+      var bx2=BX+25+Math.random()*(BW-50),br=(1.5+Math.random()*2.5).toFixed(1),bd=(1.2+Math.random()*2).toFixed(1);
+      s+='<circle cx="'+bx2+'" cy="'+(BY+BH-15)+'" r="'+br+'" fill="'+WH+'" opacity=".4" stroke="'+liqClr+'" stroke-width=".5"><animate attributeName="cy" dur="'+bd+'s" repeatCount="indefinite" values="'+(BY+BH-15)+';'+(liqY+8)+';'+(BY+BH-15)+'"/><animate attributeName="opacity" dur="'+bd+'s" repeatCount="indefinite" values=".5;0;.5"/></circle>';
+    }
+  }
+  // Tube bundle hint (horizontal lines inside)
+  for(var ti=0;ti<4;ti++){
+    var ty2=BY+BH-25-ti*18;
+    s+=ln(BX+20,ty2,BX+BW-20,ty2,'#b0bec5',.5,'opacity=".4"');
+  }
+  // 3D highlight
+  s+='<rect x="'+(BX+BW*.7)+'" y="'+(BY+12)+'" width="5" height="'+(BH-24)+'" rx="2.5" fill="'+WH+'" opacity=".2"/>';
+  s+=eqBadge(BX+BW/2,BY-40,'E-101','Bouilleur');
+  // Composition readout
+  s+=tx(BX+BW/2,liqY>BY+35?BY+30:liqY+20,'x = '+d.xs.toFixed(4),13,{b:true,c:liqDk});
+  // Duty & temperature
+  s+=mBox(BX-95,BY+BH/2-20,'\u0422 bouilleur',d.Tb.toFixed(1),'°C',liqDk);
+  s+=mBox(BX+BW/2-44,BY+BH+10,'Q reboiler',d.Qr.toFixed(1),' kW',stmClr);
+  // Utility labels
+  s+=tx(BX-15,BY+BH-30,'Vap. '+(r.stT||120)+'°C',7,{c:stmClr,a:'end'});
+  s+=tx(BX+BW+30,BY+BH-30,'Cond.',7,{c:LG,a:'start'});
 
-  // Progress bar
-  s+='<rect x="30" y="695" width="300" height="10" rx="5" fill="#e0e0e0"/>';
-  s+='<rect x="30" y="695" width="'+(300*prog)+'" height="10" rx="5" fill="'+pcClr+'"/>';
-  s+=tx(180,690,(prog*100).toFixed(1)+'%',9,{c:pcClr,b:true});
+  // ========= CONDENSER E-102 (shell & tube, horizontal) =========
+  s+='<ellipse cx="'+EX+'" cy="'+(EY+25)+'" rx="52" ry="25" fill="url(#gHX)" stroke="'+BK+'" stroke-width="2" filter="url(#sh)"/>';
+  s+=ln(EX-14,EY+3,EX-14,EY+47,LG,.8)+ln(EX+14,EY+3,EX+14,EY+47,LG,.8);
+  // 3D highlight
+  s+='<ellipse cx="'+(EX-15)+'" cy="'+(EY+15)+'" rx="18" ry="8" fill="'+WH+'" opacity=".3"/>';
+  s+=eqBadge(EX,EY-22,'E-102','Condenseur');
+  s+=mBox(EX+85,EY+5,'Q condenseur',d.Qc.toFixed(1),' kW',cwClr);
+  s+=tx(EX+87,EY+10,'CW in',7,{c:cwClr,a:'start'});
+  s+=tx(EX+87,EY+42,'CW out',7,{c:cwClr,a:'start'});
+  s+=mBox(EX+85,EY+52,'T distillat',d.Tt.toFixed(1),'°C','#1976d2');
 
-  // Data panel
-  var dpX=700,dpY=440,dpW=475,dpH=260;
-  s+='<rect x="'+dpX+'" y="'+dpY+'" width="'+dpW+'" height="'+dpH+'" rx="5" fill="#fff" stroke="#ccc" stroke-width="1"/>';
-  s+=tx(dpX+dpW/2,dpY+20,'BILAN INSTANTAN\u00c9',11,{b:true});
-  s+=ln(dpX+15,dpY+28,dpX+dpW-15,dpY+28,'#ddd',1);
+  // ========= REFLUX DRUM D-101 =========
+  var dr2=DH/2;
+  s+='<path d="M'+(DX+dr2)+','+DY+' L'+(DX+DW-dr2)+','+DY+' Q'+(DX+DW)+','+DY+' '+(DX+DW)+','+(DY+dr2)+' Q'+(DX+DW)+','+(DY+DH)+' '+(DX+DW-dr2)+','+(DY+DH)+' L'+(DX+dr2)+','+(DY+DH)+' Q'+DX+','+(DY+DH)+' '+DX+','+(DY+dr2)+' Q'+DX+','+DY+' '+(DX+dr2)+','+DY+' Z" fill="url(#gMetalV)" stroke="'+BK+'" stroke-width="2" filter="url(#sh)"/>';
+  // Liquid level in drum
+  s+='<rect x="'+(DX+5)+'" y="'+(DY+DH*.35)+'" width="'+(DW-10)+'" height="'+(DH*.6)+'" rx="3" fill="'+dstClr+'" opacity=".12"/>';
+  s+=eqBadge(DX+DW/2,DY-36,'D-101','Ballon reflux');
+
+  // ========= REFLUX DISPLAY =========
+  s+='<rect x="'+(teeX+8)+'" y="'+(rfxY+5)+'" width="84" height="26" rx="5" fill="#fff3e0" stroke="'+rfxClr+'" stroke-width="1.2" filter="url(#sh)"/>';
+  s+=tx(teeX+50,rfxY+22,'R = '+d.Ra.toFixed(2),10.5,{c:rfxClr,b:true});
+
+  // ========= DISTILLATE TANK T-102 =========
+  s+=vShadow(TX,TY,TW,TH);
+  s+='<path d="M'+TX+','+(TY+TH)+' L'+TX+','+(TY+16)+' Q'+TX+','+TY+' '+(TX+TW/2)+','+TY+' Q'+(TX+TW)+','+TY+' '+(TX+TW)+','+(TY+16)+' L'+(TX+TW)+','+(TY+TH)+' Z" fill="url(#gMetal)" stroke="'+BK+'" stroke-width="2" filter="url(#sh)"/>';
+  var dLvl=Math.min(prog,.95),dLH2=TH*dLvl*.85;
+  s+='<rect x="'+(TX+3)+'" y="'+(TY+TH-dLH2)+'" width="'+(TW-6)+'" height="'+dLH2+'" rx="2" fill="url(#gDst)"/>';
+  // Roof highlight
+  s+='<path d="M'+(TX+8)+','+(TY+12)+' Q'+(TX+TW/2)+','+(TY+4)+' '+(TX+TW-8)+','+(TY+12)+'" fill="'+WH+'" opacity=".35"/>';
+  s+=eqBadge(TX+TW/2,TY-38,'T-102','Bac distillat');
+  s+=tx(TX+TW/2,TY+TH-10,d.Dv.toFixed(1)+' L',13,{c:dstClr,b:true});
+  s+=mBox(TX+TW+12,TY+50,'xD distillat',d.xDi.toFixed(3),'',dstClr);
+
+  // ========= RESIDUE TANK T-103 =========
+  s+='<rect x="'+RX+'" y="'+RY+'" width="'+RW+'" height="'+RH+'" rx="6" fill="url(#gMetal)" stroke="'+BK+'" stroke-width="1.8" filter="url(#sh)"/>';
+  s+=eqBadge(RX+RW/2,RY-34,'T-103','Résidu');
+
+  // ========= STREAM NUMBERS =========
+  s+=sNum(CX-30,feedY,'1','#1976d2');
+  s+=sNum(CX+CW+20,CY+20,'2',vapClr);
+  s+=sNum((teeX+TX+TW/2)/2,teeY-14,'3',dstClr);
+  s+=sNum(teeX+5,rfxY-8,'4',rfxClr);
+  s+=sNum(BX+BW+20,BY+BH/2-14,'5',resClr);
+
+  // ========= PROGRESS BAR =========
+  var pcClr=prog<.85?'#43a047':prog<.95?'#ef6c00':'#c62828';
+  var pbX=30,pbY=700,pbW=320;
+  s+='<rect x="'+pbX+'" y="'+pbY+'" width="'+pbW+'" height="10" rx="5" fill="#e0e0e0"/>';
+  s+='<rect x="'+pbX+'" y="'+pbY+'" width="'+(pbW*prog)+'" height="10" rx="5" fill="'+pcClr+'"/>';
+  s+=tx(pbX+pbW/2,pbY-5,(prog*100).toFixed(1)+'%'+(d.xs>r.xW+.005?' — En cours':' — Terminé'),9,{c:pcClr,b:true});
+
+  // ========= DATA PANEL (glassmorphism) =========
+  var dpX=650,dpY=390,dpW=510,dpH=280;
+  s+='<rect x="'+dpX+'" y="'+dpY+'" width="'+dpW+'" height="'+dpH+'" rx="10" fill="'+WH+'" stroke="#cfd8dc" stroke-width="1" filter="url(#sh)" opacity=".97"/>';
+  s+=tx(dpX+dpW/2,dpY+22,'BILAN INSTANTANÉ',11,{b:true});
+  s+=ln(dpX+20,dpY+30,dpX+dpW-20,dpY+30,'#eceff1',1.5);
   var items=[
-    ['T bouilleur',d.Tb.toFixed(1)+'\u00b0C',liqClr],['T t\u00eate',d.Tt.toFixed(1)+'\u00b0C','#1976d2'],['\u0394T',Math.abs(d.Tb-d.Tt).toFixed(1)+'\u00b0C',GR],
-    ['x bouilleur',d.xs.toFixed(4),liqClr],['y vapeur',d.yv.toFixed(4),vapClr],['xD distillat',d.xDi.toFixed(4),'#2e7d32'],
-    ['Reflux R',d.Ra.toFixed(2),'#e65100'],['D\u00e9bit D',d.Dr.toFixed(2)+' kg/h','#2e7d32'],['Vol. distillat',d.Dv.toFixed(1)+' L','#2e7d32'],
-    ['Q reboiler',d.Qr.toFixed(1)+' kW','#c62828'],['Q condenseur',d.Qc.toFixed(1)+' kW','#2e7d32'],['Temps',d.t.toFixed(0)+' min',BK]
+    ['T bouilleur',d.Tb.toFixed(1)+'°C',liqDk],['T tête',d.Tt.toFixed(1)+'°C','#1976d2'],['ΔT',Math.abs(d.Tb-d.Tt).toFixed(1)+'°C',GR],
+    ['x bouilleur',d.xs.toFixed(4),liqDk],['y vapeur',d.yv.toFixed(4),vapClr],['xD distillat',d.xDi.toFixed(4),dstClr],
+    ['Reflux R',d.Ra.toFixed(2),rfxClr],['Débit D',d.Dr.toFixed(2)+' kg/h',dstClr],['Vol. distillat',d.Dv.toFixed(1)+' L',dstClr],
+    ['Q reboiler',d.Qr.toFixed(1)+' kW',stmClr],['Q condenseur',d.Qc.toFixed(1)+' kW',cwClr],['Temps',d.t.toFixed(0)+' min',BK]
   ];
   for(var k=0;k<items.length;k++){
     var col=k%3,row=Math.floor(k/3);
-    var ix=dpX+20+col*155,iy=dpY+48+row*55;
+    var ix=dpX+22+col*168,iy=dpY+50+row*58;
     s+=tx(ix,iy,items[k][0],8,{a:'start',c:GR});
-    s+=tx(ix,iy+18,items[k][1],12,{a:'start',c:items[k][2],b:true});
+    s+=tx(ix,iy+20,items[k][1],13,{a:'start',c:items[k][2],b:true});
   }
 
-  // Legend
-  s+='<rect x="'+dpX+'" y="'+(dpY+dpH+10)+'" width="'+dpW+'" height="40" rx="4" fill="#f5f5f5" stroke="#ccc" stroke-width=".8"/>';
-  s+=ln(dpX+15,dpY+dpH+30,dpX+40,dpY+dpH+30,BK,2.5);s+=tx(dpX+48,dpY+dpH+34,'Process',7,{a:'start',c:GR});
-  s+=ln(dpX+115,dpY+dpH+30,dpX+140,dpY+dpH+30,vapClr,2,'stroke-dasharray="10,5"');s+=tx(dpX+148,dpY+dpH+34,'Vapeur',7,{a:'start',c:GR});
-  s+=ln(dpX+215,dpY+dpH+30,dpX+240,dpY+dpH+30,'#e65100',2,'stroke-dasharray="8,4"');s+=tx(dpX+248,dpY+dpH+34,'Reflux',7,{a:'start',c:GR});
-  s+=ln(dpX+315,dpY+dpH+30,dpX+340,dpY+dpH+30,'#888',1.5,'stroke-dasharray="6,3"');s+=tx(dpX+348,dpY+dpH+34,'Utilit\u00e9',7,{a:'start',c:GR});
+  // ========= LEGEND =========
+  var lgY=dpY+dpH+12;
+  s+='<rect x="'+dpX+'" y="'+lgY+'" width="'+dpW+'" height="36" rx="6" fill="#f5f5f5" stroke="#e0e0e0" stroke-width=".8"/>';
+  s+=ln(dpX+15,lgY+18,dpX+38,lgY+18,BK,2.5);s+=tx(dpX+44,lgY+22,'Process',7,{a:'start',c:GR});
+  s+=ln(dpX+108,lgY+18,dpX+131,lgY+18,vapClr,2,'stroke-dasharray="10,5"');s+=tx(dpX+137,lgY+22,'Vapeur',7,{a:'start',c:GR});
+  s+=ln(dpX+200,lgY+18,dpX+223,lgY+18,rfxClr,2,'stroke-dasharray="8,4"');s+=tx(dpX+229,lgY+22,'Reflux',7,{a:'start',c:GR});
+  s+=ln(dpX+292,lgY+18,dpX+315,lgY+18,dstClr,2,'stroke-dasharray="8,4"');s+=tx(dpX+321,lgY+22,'Distillat',7,{a:'start',c:GR});
+  s+=ln(dpX+398,lgY+18,dpX+421,lgY+18,LG,1.5,'stroke-dasharray="6,3"');s+=tx(dpX+427,lgY+22,'Utilité',7,{a:'start',c:GR});
+
+  // ========= TITLE BLOCK =========
+  s+='<rect x="3" y="730" width="1194" height="48" fill="#f0f0f0" stroke="#bdbdbd" stroke-width="1" rx="0 0 3 3"/>';
+  s+=ln(600,730,600,778,'#bdbdbd',.8)+ln(940,730,940,778,'#bdbdbd',.8);
+  s+=tx(300,748,'PFD — DISTILLATION BATCH',12,{b:true});
+  s+=tx(300,762,r.l.n+' / '+r.h.n+' — '+r.model.toUpperCase()+' — '+(r.P/1000).toFixed(2)+' bar',8.5,{c:GR});
+  s+=tx(770,748,'DistillAI v2',10,{b:true})+tx(770,762,'ISO 10628',8,{c:GR});
+  s+=tx(1060,748,'Rév. 0',9,{b:true})+tx(1060,762,new Date().toLocaleDateString('fr-FR'),8,{c:GR});
 
   svg.innerHTML=s;
-  document.getElementById('aMet').innerHTML=rc(d.xs.toFixed(4),'x bouilleur','')+rc(d.yv.toFixed(4),'y vapeur','')+rc(d.Tb.toFixed(1),'T\u00b0 pied','\u00b0C')+rc(d.Tt.toFixed(1),'T\u00b0 t\u00eate','\u00b0C')+rc(d.Dv.toFixed(1),'Vol. dist.','L')+rc(d.Dr.toFixed(2),'D\u00e9bit dist.','kg/h');
+  document.getElementById('aMet').innerHTML=rc(d.xs.toFixed(4),'x bouilleur','')+rc(d.yv.toFixed(4),'y vapeur','')+rc(d.Tb.toFixed(1),'T° pied','°C')+rc(d.Tt.toFixed(1),'T° tête','°C')+rc(d.Dv.toFixed(1),'Vol. dist.','L')+rc(d.Dr.toFixed(2),'Débit dist.','kg/h');
 }
 
 function toggleAnim(){
