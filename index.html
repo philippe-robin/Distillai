@@ -834,325 +834,243 @@ function showResults(){const r=R_;
 
 // ===== P&ID =====
 function drawPID(){const r=R_,svg=document.getElementById('pidSvg');
-// === ISO 14617 P&ID — Professional Drawing ===
-const F='font-family="Arial,Helvetica,sans-serif"',FS=F+' font-size=',BK='#1a1a1a',GR='#666',LG='#999',
-  PL='#0d47a1',VL='#b71c1c',CL='#1b5e20',UL='#6a1b9a',SG='#c62828';
-// Helpers
-function txt(x,y,s,sz,opts){opts=opts||{};return`<text x="${x}" y="${y}" ${FS}"${sz}" fill="${opts.c||BK}" text-anchor="${opts.a||'middle'}" ${opts.b?'font-weight="bold"':''}${opts.ff?' font-family="'+opts.ff+'"':''}>${s}</text>`}
-function line(x1,y1,x2,y2,c,w,opts){opts=opts||'';return`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}" ${opts}/>`}
-function polyline(pts,c,w,opts){return`<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="${w}" ${opts||''}/>`}
-function rect(x,y,w,h,opts){opts=opts||{};return`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${opts.r||0}" fill="${opts.f||'none'}" stroke="${opts.s||BK}" stroke-width="${opts.sw||1.5}"/>`}
-// Instrument bubble ISA 5.1: circle with tag, line = field; circle+line = panel
+// === ISO 14617 / ISA 5.1 P&ID ===
+const BK='#222',GR='#555',LG='#888',PL='#1565c0',VL='#c62828',CL='#2e7d32',SG='#d32f2f';
+const LW=1.5,LWfine=1,LWutil=1,LWsig=0.7; // line weights
+function txt(x,y,s,sz,o){o=o||{};return`<text x="${x}" y="${y}" font-family="Arial,sans-serif" font-size="${sz}" fill="${o.c||BK}" text-anchor="${o.a||'middle'}"${o.b?' font-weight="bold"':''}>${s}</text>`}
+function ln(x1,y1,x2,y2,c,w,o){return`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="${w}"${o?' '+o:''}/>`}
+function pl(pts,c,w,o){return`<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="${w}"${o?' '+o:''}/>`}
+function rct(x,y,w,h,o){o=o||{};return`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${o.r||0}" fill="${o.f||'none'}" stroke="${o.s||BK}" stroke-width="${o.sw||LW}"/>`}
+// ISA 5.1 instrument bubble (r=11)
 function instr(x,y,tag,loop,panel){
-  let s=`<circle cx="${x}" cy="${y}" r="14" fill="#fff" stroke="${BK}" stroke-width="1.5"/>`;
-  if(panel) s+=`<line x1="${x-14}" y1="${y}" x2="${x+14}" y2="${y}" stroke="${BK}" stroke-width="1"/>`;
-  s+=txt(x,y-3,tag,8,{b:true})+txt(x,y+8,loop,7,{c:GR});return s;
+  let s=`<circle cx="${x}" cy="${y}" r="11" fill="#fff" stroke="${BK}" stroke-width="${LW}"/>`;
+  if(panel)s+=ln(x-11,y,x+11,y,BK,0.7);
+  s+=txt(x,y-2,tag,6.5,{b:true})+txt(x,y+6.5,loop,5.5,{c:GR});return s;
 }
-// Control valve ISO 14617-8: two triangles
-function ctrlValve(x,y,tag,horiz){
-  let s='';
-  if(horiz){
-    s+=`<polygon points="${x-10},${y-8} ${x},${y} ${x-10},${y+8}" fill="none" stroke="${BK}" stroke-width="1.5"/>`;
-    s+=`<polygon points="${x+10},${y-8} ${x},${y} ${x+10},${y+8}" fill="none" stroke="${BK}" stroke-width="1.5"/>`;
-    s+=`<line x1="${x}" y1="${y}" x2="${x}" y2="${y-16}" stroke="${BK}" stroke-width="1"/>`;
-  }else{
-    s+=`<polygon points="${x-8},${y-10} ${x},${y} ${x+8},${y-10}" fill="none" stroke="${BK}" stroke-width="1.5"/>`;
-    s+=`<polygon points="${x-8},${y+10} ${x},${y} ${x+8},${y+10}" fill="none" stroke="${BK}" stroke-width="1.5"/>`;
-    s+=`<line x1="${x}" y1="${y}" x2="${x+16}" y2="${y}" stroke="${BK}" stroke-width="1"/>`;
-  }
-  s+=txt(x,y+22,tag,7,{c:GR});return s;
+// Control valve (bowtie, size 7)
+function cv(x,y,tag,hz){
+  const a=7,b=6;let s='';
+  if(hz){s+=`<polygon points="${x-a},${y-b} ${x},${y} ${x-a},${y+b}" fill="none" stroke="${BK}" stroke-width="${LW}"/><polygon points="${x+a},${y-b} ${x},${y} ${x+a},${y+b}" fill="none" stroke="${BK}" stroke-width="${LW}"/>`;s+=ln(x,y,x,y-12,BK,LWfine)}
+  else{s+=`<polygon points="${x-b},${y-a} ${x},${y} ${x+b},${y-a}" fill="none" stroke="${BK}" stroke-width="${LW}"/><polygon points="${x-b},${y+a} ${x},${y} ${x+b},${y+a}" fill="none" stroke="${BK}" stroke-width="${LW}"/>`;s+=ln(x,y,x+12,y,BK,LWfine)}
+  s+=txt(x,y+(hz?18:20),tag,5.5,{c:GR});return s;
 }
-// Manual valve (ISO: bowtie)
-function manValve(x,y){
-  return`<polygon points="${x-7},${y-6} ${x},${y} ${x-7},${y+6}" fill="${BK}" stroke="${BK}" stroke-width="1"/>`+
-  `<polygon points="${x+7},${y-6} ${x},${y} ${x+7},${y+6}" fill="${BK}" stroke="${BK}" stroke-width="1"/>`;
+// Manual valve (filled bowtie, size 5)
+function mv(x,y){return`<polygon points="${x-5},${y-4} ${x},${y} ${x-5},${y+4}" fill="${BK}" stroke="${BK}" stroke-width="0.8"/><polygon points="${x+5},${y-4} ${x},${y} ${x+5},${y+4}" fill="${BK}" stroke="${BK}" stroke-width="0.8"/>`}
+// PSV
+function psv(x,y,tag,sp){
+  let s=`<polygon points="${x-7},${y} ${x},${y-11} ${x+7},${y}" fill="none" stroke="${SG}" stroke-width="${LW}"/>`;
+  s+=ln(x,y-11,x,y-20,SG,LW)+ln(x-4,y-20,x+4,y-20,SG,1.8)+ln(x-3,y-23,x+3,y-23,SG,1.2);
+  s+=txt(x,y+10,tag,6.5,{c:SG,b:true})+txt(x,y+18,sp,5.5,{c:SG});return s;
 }
-// Safety valve PSV (ISO: spring-loaded)
-function psv(x,y,tag,setP){
-  let s=`<polygon points="${x-9},${y} ${x},${y-14} ${x+9},${y}" fill="none" stroke="${SG}" stroke-width="2"/>`;
-  s+=`<line x1="${x}" y1="${y-14}" x2="${x}" y2="${y-26}" stroke="${SG}" stroke-width="2"/>`;
-  s+=`<line x1="${x-6}" y1="${y-26}" x2="${x+6}" y2="${y-26}" stroke="${SG}" stroke-width="2.5"/>`;
-  s+=`<line x1="${x-4}" y1="${y-30}" x2="${x+4}" y2="${y-30}" stroke="${SG}" stroke-width="2"/>`;
-  s+=txt(x,y+12,tag,8,{c:SG,b:true})+txt(x,y+22,setP,7,{c:SG});return s;
-}
-// Centrifugal pump ISO 14617-9: circle + triangle
+// Pump (r=13)
 function pump(x,y,tag){
-  let s=`<circle cx="${x}" cy="${y}" r="16" fill="#fff" stroke="${BK}" stroke-width="2"/>`;
-  s+=`<polygon points="${x-6},${y-9} ${x-6},${y+9} ${x+10},${y}" fill="none" stroke="${BK}" stroke-width="1.5"/>`;
-  s+=txt(x,y+28,tag,8,{b:true});return s;
+  let s=`<circle cx="${x}" cy="${y}" r="13" fill="#fff" stroke="${BK}" stroke-width="${LW}"/>`;
+  s+=`<polygon points="${x-5},${y-7} ${x-5},${y+7} ${x+8},${y}" fill="none" stroke="${BK}" stroke-width="${LWfine}"/>`;
+  s+=txt(x,y+24,tag,7,{b:true});return s;
 }
-// Shell & tube HX ISO 14617-10: circle + lines
-function hx(x,y,tag,duty,orient){
-  // orient: 'h' horizontal, 'v' vertical
-  let s='';
-  if(orient==='v'){
-    s+=`<ellipse cx="${x}" cy="${y}" rx="30" ry="42" fill="#fff" stroke="${BK}" stroke-width="2"/>`;
-    s+=line(x-30,y-10,x+30,y-10,BK,1)+line(x-30,y+10,x+30,y+10,BK,1);
-  }else{
-    s+=`<ellipse cx="${x}" cy="${y}" rx="42" ry="28" fill="#fff" stroke="${BK}" stroke-width="2"/>`;
-    s+=line(x-10,y-28,x-10,y+28,BK,1)+line(x+10,y-28,x+10,y+28,BK,1);
-  }
-  s+=txt(x,y-2,tag,9,{b:true})+txt(x,y+10,duty,7,{c:GR});return s;
+// HX (shell & tube)
+function hx(x,y,tag,duty,hz){
+  let s='';const rA=hz?35:25,rB=hz?22:35;
+  s+=`<ellipse cx="${x}" cy="${y}" rx="${rA}" ry="${rB}" fill="#fff" stroke="${BK}" stroke-width="${LW}"/>`;
+  if(hz){s+=ln(x-8,y-rB,x-8,y+rB,BK,0.6)+ln(x+8,y-rB,x+8,y+rB,BK,0.6)}
+  else{s+=ln(x-rA,y-8,x+rA,y-8,BK,0.6)+ln(x-rA,y+8,x+rA,y+8,BK,0.6)}
+  s+=txt(x,y-2,tag,7.5,{b:true})+txt(x,y+9,duty,5.5,{c:GR});return s;
 }
-// Tank (vertical vessel with flat bottom, dome top)
+// Tank
 function tank(x,y,w,h,tag,desc,vol){
-  let s=`<path d="M${x},${y+h} L${x},${y+12} Q${x},${y} ${x+w/2},${y} Q${x+w},${y} ${x+w},${y+12} L${x+w},${y+h} Z" fill="#fff" stroke="${BK}" stroke-width="2"/>`;
-  s+=txt(x+w/2,y+h/2-4,tag,10,{b:true})+txt(x+w/2,y+h/2+10,desc,8,{c:GR});
-  if(vol)s+=txt(x+w/2,y+h/2+22,vol,7,{c:LG});return s;
+  let s=`<path d="M${x},${y+h} L${x},${y+10} Q${x},${y} ${x+w/2},${y} Q${x+w},${y} ${x+w},${y+10} L${x+w},${y+h} Z" fill="#fff" stroke="${BK}" stroke-width="${LW}"/>`;
+  s+=txt(x+w/2,y+h/2-4,tag,8.5,{b:true})+txt(x+w/2,y+h/2+9,desc,6.5,{c:GR});
+  if(vol)s+=txt(x+w/2,y+h/2+19,vol,5.5,{c:LG});return s;
 }
-// Horizontal drum
+// Drum (horizontal)
 function drum(x,y,w,h,tag,desc){
-  let r2=h/2;
-  let s=`<path d="M${x+r2},${y} L${x+w-r2},${y} Q${x+w},${y} ${x+w},${y+r2} Q${x+w},${y+h} ${x+w-r2},${y+h} L${x+r2},${y+h} Q${x},${y+h} ${x},${y+r2} Q${x},${y} ${x+r2},${y} Z" fill="#fff" stroke="${BK}" stroke-width="2"/>`;
-  s+=txt(x+w/2,y+h/2-2,tag,9,{b:true})+txt(x+w/2,y+h/2+11,desc,8,{c:GR});return s;
+  const r2=h/2;
+  let s=`<path d="M${x+r2},${y} L${x+w-r2},${y} Q${x+w},${y} ${x+w},${y+r2} Q${x+w},${y+h} ${x+w-r2},${y+h} L${x+r2},${y+h} Q${x},${y+h} ${x},${y+r2} Q${x},${y} ${x+r2},${y} Z" fill="#fff" stroke="${BK}" stroke-width="${LW}"/>`;
+  s+=txt(x+w/2,y+h/2-1,tag,7.5,{b:true})+txt(x+w/2,y+h/2+10,desc,6,{c:GR});return s;
 }
-// Distillation column ISO 14617-11: tall rectangle with internals
-function column(x,y,w,h,tag,specs,nPlates){
-  let s=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="#fff" stroke="${BK}" stroke-width="2.5"/>`;
-  // Dished heads
-  s+=`<path d="M${x},${y+6} Q${x+w/2},${y-8} ${x+w},${y+6}" fill="none" stroke="${BK}" stroke-width="2.5"/>`;
-  s+=`<path d="M${x},${y+h-6} Q${x+w/2},${y+h+8} ${x+w},${y+h-6}" fill="none" stroke="${BK}" stroke-width="2.5"/>`;
-  // Internals: tray lines
-  const nDraw=Math.min(nPlates||6,12);
-  const sp=(h-40)/nDraw;
-  for(let i=1;i<=nDraw;i++){
-    const ty=y+15+i*sp;
-    s+=line(x+6,ty,x+w-6,ty,'#bbb',0.8);
-    // Weir
-    s+=line(x+w-14,ty,x+w-14,ty-sp*0.5,'#bbb',0.8);
-  }
-  s+=txt(x+w/2,y-18,tag,12,{b:true})+txt(x+w/2,y-6,specs,8,{c:GR});return s;
+// Column
+function column(x,y,w,h,tag,specs,np){
+  let s=`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5" fill="#fff" stroke="${BK}" stroke-width="2"/>`;
+  s+=`<path d="M${x},${y+5} Q${x+w/2},${y-6} ${x+w},${y+5}" fill="none" stroke="${BK}" stroke-width="2"/>`;
+  s+=`<path d="M${x},${y+h-5} Q${x+w/2},${y+h+6} ${x+w},${y+h-5}" fill="none" stroke="${BK}" stroke-width="2"/>`;
+  const nd=Math.min(np||6,14),sp=(h-30)/nd;
+  for(let i=1;i<=nd;i++){const ty=y+12+i*sp;s+=ln(x+5,ty,x+w-5,ty,'#ccc',0.5);s+=ln(x+w-12,ty,x+w-12,ty-sp*.45,'#ccc',0.5)}
+  s+=txt(x+w/2,y-14,tag,10,{b:true})+txt(x+w/2,y-4,specs,6.5,{c:GR});return s;
 }
-// Signal lines
-function sigLine(pts,type){
-  // type: 'e'=electric(dashed), 'p'=pneumatic(dashed+dots), 's'=software(double dash)
-  const d=type==='e'?'stroke-dasharray="6,3"':type==='p'?'stroke-dasharray="8,3,2,3"':'stroke-dasharray="10,3"';
-  return polyline(pts,'#333',0.8,d);
-}
-// Process line with arrow
-function procLine(pts,c,w){
-  return polyline(pts,c||BK,w||2.5,'marker-end="url(#ar)"');
-}
-// Utility line
-function utilLine(pts,c){
-  return polyline(pts,c||'#888',1.5,'stroke-dasharray="8,4"');
-}
+// Lines
+function proc(pts,c){return pl(pts,c||BK,LW,'marker-end="url(#arr)"')}
+function util(pts,c){return pl(pts,c||LG,LWutil,'stroke-dasharray="6,3"')}
+function sig(pts){return pl(pts,'#444',LWsig,'stroke-dasharray="4,2"')}
 
 // ========= BUILD SVG =========
-let s='';
-// Defs: markers, patterns
-s+=`<defs>
-<marker id="ar" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="${BK}"/></marker>
-<marker id="arR" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="${SG}"/></marker>
-<marker id="arU" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="#888"/></marker>
-<pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6"><path d="M0,6 l6,-6" stroke="#ddd" stroke-width="0.5"/></pattern>
+let s=`<defs>
+<marker id="arr" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="${BK}"/></marker>
+<marker id="arrB" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="${PL}"/></marker>
+<marker id="arrR" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="${VL}"/></marker>
 </defs>`;
 
-// Border & title block (engineering drawing style)
-s+=rect(5,5,1390,890,{s:'#333',sw:2});
-// Title block bottom
-s+=rect(5,830,1390,65,{f:'#f8f8f8',s:'#333',sw:1.5});
-s+=line(700,830,700,895,'#333',1);
-s+=line(1050,830,1050,895,'#333',1);
-s+=txt(352,848,'P&ID — DISTILLATION BATCH',14,{b:true});
-s+=txt(352,866,r.l.n+' / '+r.h.n+' — '+r.model.toUpperCase()+' — P = '+(r.P/1000).toFixed(2)+' bar',10,{c:GR});
-s+=txt(352,882,'xF='+r.xF+' xD='+r.xD+' xW='+r.xW+' R='+r.R.toFixed(2)+' R/Rmin='+(r.R/r.Rmin).toFixed(2),9,{c:LG});
-s+=txt(875,848,'DistillAI v2',11,{b:true});
-s+=txt(875,864,'ISO 14617 / ISA 5.1',9,{c:GR});
-s+=txt(875,880,new Date().toLocaleDateString('fr-FR'),9,{c:LG});
-s+=txt(1220,848,'Rév. 0',10,{b:true});
-s+=txt(1220,864,'Échelle : N.T.S.',9,{c:GR});
-s+=txt(1220,880,'Feuille 1/1',9,{c:LG});
+// Border & title block
+s+=rct(5,5,1390,890,{s:'#444',sw:1.5});
+s+=rct(5,840,1390,55,{f:'#f9f9f9',s:'#444',sw:1});
+s+=ln(700,840,700,895,'#444',0.7)+ln(1050,840,1050,895,'#444',0.7);
+s+=txt(352,856,'P&ID — DISTILLATION BATCH',12,{b:true});
+s+=txt(352,870,r.l.n+' / '+r.h.n+' — '+r.model.toUpperCase()+' — P='+(r.P/1000).toFixed(2)+' bar',8,{c:GR});
+s+=txt(352,882,'xF='+r.xF+'  xD='+r.xD+'  xW='+r.xW+'  R='+r.R.toFixed(2),7,{c:LG});
+s+=txt(875,856,'DistillAI v2',9,{b:true})+txt(875,870,'ISO 14617 · ISA 5.1',7,{c:GR})+txt(875,882,new Date().toLocaleDateString('fr-FR'),7,{c:LG});
+s+=txt(1220,856,'Rév. 0',8,{b:true})+txt(1220,870,'N.T.S.',7,{c:GR})+txt(1220,882,'Feuille 1/1',7,{c:LG});
 
-// ===== EQUIPMENT LAYOUT =====
-// Positions
-const CX=500,CY=185,CW=65,CH=380; // Column
-const ErebX=500,ErebY=650;          // Reboiler
-const EcondX=780,EcondY=110;        // Condenser
-const DrumX=920,DrumY=180;          // Reflux drum
-const T1X=80,T1Y=360;               // Feed tank
-const T2X=1200,T2Y=320;             // Distillate tank
-const T3X=800,T3Y=680;              // Residue tank
-const P1X=250,P1Y=440;              // Feed pump
-const P2X=1050,P2Y=295;             // Reflux/distillate pump
+// ===== LAYOUT =====
+const CX=460,CY=160,CW=55,CH=360;        // Column (narrower)
+const ErebX=460,ErebY=620;                 // Reboiler
+const EcondX=720,EcondY=80;                // Condenser
+const DrumX=900,DrumY=140;                 // Reflux drum
+const T1X=60,T1Y=310;                      // Feed tank
+const T2X=1210,T2Y=250;                    // Distillate tank
+const T3X=760,T3Y=660;                     // Residue tank
+const P1X=220,P1Y=420;                     // Feed pump
+const P2X=1040,P2Y=260;                    // Reflux pump
 
-// T-101 Feed tank
-s+=tank(T1X,T1Y,110,130,'T-101','Bac de charge',r.vF+' L');
-// Level indicator on feed tank
-s+=line(T1X-8,T1Y+30,T1X-8,T1Y+120,'#333',1);
-s+=line(T1X-14,T1Y+30,T1X-2,T1Y+30,'#333',1);
-s+=line(T1X-14,T1Y+120,T1X-2,T1Y+120,'#333',1);
-s+=txt(T1X-22,T1Y+75,'LG',7,{c:GR});
+// --- T-101 Feed tank ---
+s+=tank(T1X,T1Y,100,120,'T-101','Bac de charge',r.vF+' L');
+s+=ln(T1X-6,T1Y+25,T1X-6,T1Y+110,BK,0.7)+ln(T1X-10,T1Y+25,T1X-2,T1Y+25,BK,0.7)+ln(T1X-10,T1Y+110,T1X-2,T1Y+110,BK,0.7);
+s+=txt(T1X-16,T1Y+68,'LG',5.5,{c:GR});
 
-// P-101 Feed pump
+// --- P-101 Feed pump ---
 s+=pump(P1X,P1Y,'P-101');
-// Feed line: T-101 → P-101 → column
-s+=procLine(`${T1X+110},${T1Y+100} ${P1X-20},${T1Y+100} ${P1X-20},${P1Y}`,PL,2.5);
-s+=line(P1X-20,P1Y,P1X-16,P1Y,PL,2.5);
-s+=manValve(T1X+130,T1Y+100);
-s+=procLine(`${P1X+16},${P1Y} ${P1X+60},${P1Y} ${P1X+60},${CY+CH/2} ${CX},${CY+CH/2}`,PL,2.5);
-// Feed nozzle arrow
-s+=txt(P1X+65,CY+CH/2-8,'CHARGE',7,{c:PL,a:'start'});
-// Line number
-s+=txt(P1X+30,P1Y-18,'2"-PL-001',7,{c:GR});
+// Feed line: T-101 → MV → P-101 → column
+s+=pl(`${T1X+100},${T1Y+90} ${P1X-18},${T1Y+90} ${P1X-18},${P1Y}`,PL,LW,'marker-end="url(#arrB)"');
+s+=ln(P1X-18,P1Y,P1X-13,P1Y,PL,LW);
+s+=mv(T1X+120,T1Y+90);
+s+=pl(`${P1X+13},${P1Y} ${P1X+50},${P1Y} ${P1X+50},${CY+CH/2} ${CX},${CY+CH/2}`,PL,LW,'marker-end="url(#arrB)"');
+s+=txt(P1X+55,CY+CH/2-6,'CHARGE',5.5,{c:PL,a:'start'});
+s+=txt(P1X+15,P1Y-15,'2"-PL-001',5.5,{c:GR});
 
-// C-101 Column
+// --- C-101 Column ---
 const Np=Math.ceil(r.Nth)||8;
-s+=column(CX,CY,CW,CH,'C-101','DN'+(r.Dstd*1000).toFixed(0)+' · H='+r.Htot.toFixed(1)+'m',Np);
-// Nozzle labels
-s+=txt(CX-8,CY+15,'N1',7,{c:LG,a:'end'}); // top vapor
-s+=txt(CX-8,CY+CH-15,'N2',7,{c:LG,a:'end'}); // bottom liquid
+s+=column(CX,CY,CW,CH,'C-101','DN'+(r.Dstd*1000).toFixed(0)+' H='+r.Htot.toFixed(1)+'m',Np);
 
-// E-101 Reboiler
-s+=hx(ErebX,ErebY,'E-101',r.Qreb.toFixed(1)+' kW','h');
-// Column bottom to reboiler
-s+=procLine(`${CX+CW/2},${CY+CH} ${CX+CW/2},${ErebY-32}`,VL,2.5);
+// --- E-101 Reboiler ---
+s+=hx(ErebX,ErebY,'E-101',r.Qreb.toFixed(1)+' kW',true);
+// Column bottom → reboiler
+s+=pl(`${CX+CW/2},${CY+CH+6} ${CX+CW/2},${ErebY-25}`,BK,LW,'marker-end="url(#arr)"');
 // Reboiler vapor return
-s+=procLine(`${ErebX+45},${ErebY-20} ${CX+CW+15},${ErebY-20} ${CX+CW+15},${CY+CH-30} ${CX+CW},${CY+CH-30}`,VL,2);
-s+=txt(CX+CW+20,CY+CH-55,'Vapeur',7,{c:VL,a:'start'});
-// Steam utility to reboiler
-s+=utilLine(`${ErebX-80},${ErebY+20} ${ErebX-42},${ErebY+20}`,'#c62828');
-s+=txt(ErebX-85,ErebY+24,'Vapeur '+r.stT+'°C',8,{c:'#c62828',a:'end'});
-// Condensate out
-s+=utilLine(`${ErebX+42},${ErebY+20} ${ErebX+90},${ErebY+20}`,'#c62828');
-s+=txt(ErebX+95,ErebY+24,'Condensat',8,{c:'#c62828',a:'start'});
-// Steam control valve
-s+=ctrlValve(ErebX-60,ErebY+20,'TCV-102',true);
+s+=pl(`${ErebX+38},${ErebY-15} ${CX+CW+12},${ErebY-15} ${CX+CW+12},${CY+CH-25}`,BK,LW,'marker-end="url(#arr)"');
+s+=txt(CX+CW+16,CY+CH-45,'Vapeur',5.5,{c:VL,a:'start'});
+// Steam in/out
+s+=util(`${ErebX-70},${ErebY+16} ${ErebX-35},${ErebY+16}`,VL);
+s+=cv(ErebX-52,ErebY+16,'TCV-102',true);
+s+=txt(ErebX-75,ErebY+12,'Vap. '+r.stT+'°C',5.5,{c:VL,a:'end'});
+s+=util(`${ErebX+35},${ErebY+16} ${ErebX+75},${ErebY+16}`,VL);
+s+=txt(ErebX+80,ErebY+12,'Condensat',5.5,{c:VL,a:'start'});
 
-// Vapor line: column top → condenser
-s+=procLine(`${CX+CW/2},${CY} ${CX+CW/2},${EcondY} ${EcondX-45},${EcondY}`,UL,2.5);
-s+=txt(CX+CW/2+5,CY-10,'4"-PV-001',7,{c:GR,a:'start'});
+// --- Vapor line: column top → condenser ---
+s+=pl(`${CX+CW/2},${CY} ${CX+CW/2},${EcondY} ${EcondX-38},${EcondY}`,BK,LW,'marker-end="url(#arr)"');
+s+=txt(CX+CW/2+4,EcondY-8,'4"-PV-001',5.5,{c:GR,a:'start'});
 
-// E-102 Condenser
-s+=hx(EcondX,EcondY,'E-102',r.Qcond.toFixed(1)+' kW','h');
-// CW utility
-s+=utilLine(`${EcondX-10},${EcondY-32} ${EcondX-10},${EcondY-52}`,'#1b5e20');
-s+=utilLine(`${EcondX+10},${EcondY-32} ${EcondX+10},${EcondY-52}`,'#1b5e20');
-s+=txt(EcondX,EcondY-58,'CW '+r.cwIn+'°C/'+r.cwOut+'°C',8,{c:CL});
+// --- E-102 Condenser ---
+s+=hx(EcondX,EcondY,'E-102',r.Qcond.toFixed(1)+' kW',true);
+s+=util(`${EcondX-8},${EcondY-25} ${EcondX-8},${EcondY-42}`,CL);
+s+=util(`${EcondX+8},${EcondY-25} ${EcondX+8},${EcondY-42}`,CL);
+s+=txt(EcondX,EcondY-48,'CW '+r.cwIn+'°C/'+r.cwOut+'°C',5.5,{c:CL});
 
-// Condensate to reflux drum
-s+=procLine(`${EcondX+45},${EcondY} ${DrumX},${EcondY} ${DrumX},${DrumY}`,'#333',2.5);
+// Condensate → reflux drum
+s+=pl(`${EcondX+38},${EcondY} ${DrumX-55},${EcondY} ${DrumX-55},${DrumY}`,BK,LW,'marker-end="url(#arr)"');
 
-// D-101 Reflux drum (horizontal)
-s+=drum(DrumX-50,DrumY,100,50,'D-101','Ballon reflux');
-// Vent on drum
-s+=line(DrumX+50,DrumY+10,DrumX+75,DrumY+10,'#333',1.5);
-s+=txt(DrumX+80,DrumY+14,'Évent',7,{c:GR,a:'start'});
+// --- D-101 Reflux drum ---
+s+=drum(DrumX-55,DrumY,110,42,'D-101','Ballon reflux');
+s+=ln(DrumX+55,DrumY+8,DrumX+72,DrumY+8,BK,LWfine);
+s+=txt(DrumX+76,DrumY+12,'Évent',5.5,{c:GR,a:'start'});
 
-// P-102 Reflux/distillate pump
+// --- P-102 Reflux/distillate pump ---
 s+=pump(P2X,P2Y,'P-102');
-// Drum → pump
-s+=procLine(`${DrumX},${DrumY+50} ${DrumX},${P2Y} ${P2X-16},${P2Y}`,'#333',2.5);
+s+=pl(`${DrumX},${DrumY+42} ${DrumX},${P2Y} ${P2X-13},${P2Y}`,BK,LW,'marker-end="url(#arr)"');
 
-// Tee point after pump
-const TX=P2X+55,TY=P2Y;
-s+=line(P2X+16,P2Y,TX,TY,'#333',2.5);
-s+=`<circle cx="${TX}" cy="${TY}" r="3" fill="${BK}"/>`;
+// Tee after pump
+const TEX=P2X+45,TEY=P2Y;
+s+=ln(P2X+13,P2Y,TEX,TEY,BK,LW);
+s+=`<circle cx="${TEX}" cy="${TEY}" r="2.5" fill="${BK}"/>`;
 
-// Reflux line: tee → up → back to column top
-s+=procLine(`${TX},${TY} ${TX},${CY+25} ${CX+CW},${CY+25}`,PL,2);
-s+=txt(TX+5,CY+60,'Reflux R='+r.R.toFixed(2),8,{c:PL,a:'start'});
-// Reflux control valve
-s+=ctrlValve(TX,CY+80,'FCV-101',false);
+// --- Reflux line: tee → down alongside column → enters column side ---
+// Route reflux BELOW the condenser/drum level, alongside column right side
+const rfY=CY+30; // reflux enters column near top
+s+=pl(`${TEX},${TEY} ${TEX},${rfY} ${CX+CW},${rfY}`,PL,LW,'marker-end="url(#arrB)"');
+s+=cv(TEX,CY+70,'FCV-101',false);
+s+=txt(TEX+14,CY+55,'R='+r.R.toFixed(2),5.5,{c:PL,a:'start'});
 
-// Distillate line: tee → T-102
-s+=procLine(`${TX},${TY} ${T2X},${TY} ${T2X},${T2Y}`,PL,2);
-// Distillate control valve
-const DVX=(TX+T2X)/2;
-s+=ctrlValve(DVX,TY,'FCV-102',true);
-s+=txt(DVX,TY-25,'2"-PL-003 Distillat',7,{c:GR});
+// --- Distillate line: tee → right → T-102 ---
+s+=pl(`${TEX},${TEY} ${T2X-55},${TEY} ${T2X-55},${T2Y}`,PL,LW,'marker-end="url(#arrB)"');
+const DVX=(TEX+T2X-55)/2;
+s+=cv(DVX,TEY,'FCV-102',true);
+s+=txt(DVX,TEY-18,'2"-PL-003',5.5,{c:GR});
 
-// T-102 Distillate tank
-s+=tank(T2X-55,T2Y,110,120,'T-102','Bac distillat',r.vD.toFixed(0)+' L');
+// TI-103 on distillate line
+s+=instr(DVX+50,TEY-25,'TI','103',false);
+s+=ln(DVX+50,TEY-14,DVX+50,TEY-3,BK,LWfine);
 
-// Residue line: column bottom → T-103
-s+=procLine(`${CX+CW/2-15},${CY+CH} ${CX+CW/2-15},${CY+CH+35} ${T3X},${CY+CH+35} ${T3X},${T3Y}`,'#795548',2);
-s+=manValve(CX+CW/2+40,CY+CH+35);
-s+=txt(CX+CW/2+60,CY+CH+28,'2"-PL-004 Résidu',7,{c:GR,a:'start'});
+// --- T-102 Distillate tank ---
+s+=tank(T2X-105,T2Y,100,110,'T-102','Bac distillat',r.vD.toFixed(0)+' L');
 
-// T-103 Residue tank
-s+=tank(T3X-45,T3Y,90,100,'T-103','Résidu','');
+// --- Residue line ---
+s+=pl(`${CX+CW/2-12},${CY+CH+6} ${CX+CW/2-12},${CY+CH+30} ${T3X},${CY+CH+30} ${T3X},${T3Y}`,'#795548',LW,'marker-end="url(#arr)"');
+s+=mv(CX+CW/2+30,CY+CH+30);
+s+=txt(CX+CW/2+45,CY+CH+24,'2"-PL-004 Résidu',5.5,{c:GR,a:'start'});
 
-// ===== PSV - Safety valve on column top =====
-s+=psv(CX+CW+35,CY-10,'PSV-101',(r.P*1.1/1000).toFixed(2)+' bar');
-s+=line(CX+CW,CY+10,CX+CW+35,CY+10,SG,1.5);
-s+=line(CX+CW+35,CY+10,CX+CW+35,CY,SG,1.5);
-// PSV discharge line
-s+=line(CX+CW+35,CY-36,CX+CW+35,CY-50,SG,1.5);
-s+=txt(CX+CW+35,CY-55,'→ Évent sécurité',7,{c:SG});
+// --- T-103 Residue tank ---
+s+=tank(T3X-40,T3Y,80,90,'T-103','Résidu','');
 
-// ===== INSTRUMENTATION (ISA 5.1 bubbles) =====
-// TIC-101: Temperature top column → controls reflux
-const ti1X=CX-35,ti1Y=CY+40;
-s+=instr(ti1X,ti1Y,'TIC','101',true);
-s+=line(CX,CY+40,ti1X+14,ti1Y,'#333',1);
-s+=sigLine(`${ti1X},${ti1Y+14} ${ti1X},${CY+80} ${TX+16},${CY+80}`,'e');
+// ===== PSV =====
+s+=psv(CX+CW+30,CY+5,'PSV-101',(r.P*1.1/1000).toFixed(2)+' bar');
+s+=ln(CX+CW,CY+15,CX+CW+23,CY+15,SG,LW);
+s+=ln(CX+CW+23,CY+15,CX+CW+23,CY+5+7,SG,LW);
+s+=ln(CX+CW+30,CY+5-23,CX+CW+30,CY+5-32,SG,LWfine);
+s+=txt(CX+CW+30,CY+5-37,'Évent sécurité',5.5,{c:SG});
 
-// TIC-102: Temperature bottom column → controls steam valve
-const ti2X=CX-35,ti2Y=CY+CH-40;
-s+=instr(ti2X,ti2Y,'TIC','102',true);
-s+=line(CX,CY+CH-40,ti2X+14,ti2Y,'#333',1);
-s+=sigLine(`${ti2X},${ti2Y+14} ${ti2X},${ErebY+50} ${ErebX-60},${ErebY+50} ${ErebX-60},${ErebY+36}`,'e');
+// ===== INSTRUMENTATION =====
+// TIC-101 top column → reflux valve
+const i1X=CX-40,i1Y=CY+50;
+s+=instr(i1X,i1Y,'TIC','101',true);
+s+=ln(CX,i1Y,i1X+11,i1Y,BK,LWfine);
+s+=sig(`${i1X},${i1Y+11} ${i1X},${CY+70} ${TEX+12},${CY+70}`);
 
-// PIC-101: Pressure top column
-const piX=CX-35,piY=CY+100;
-s+=instr(piX,piY,'PIC','101',true);
-s+=line(CX,CY+100,piX+14,piY,'#333',1);
+// TIC-102 bottom column → steam valve
+const i2X=CX-40,i2Y=CY+CH-50;
+s+=instr(i2X,i2Y,'TIC','102',true);
+s+=ln(CX,i2Y,i2X+11,i2Y,BK,LWfine);
+s+=sig(`${i2X},${i2Y+11} ${i2X},${ErebY+40} ${ErebX-52},${ErebY+40} ${ErebX-52},${ErebY+28}`);
 
-// LIC-101: Level in reflux drum → controls distillate valve
-const liX=DrumX+60,liY=DrumY+25;
-s+=instr(liX,liY,'LIC','101',true);
-s+=line(DrumX+50,DrumY+25,liX-14,liY,'#333',1);
-s+=sigLine(`${liX},${liY+14} ${liX},${TY+30} ${DVX},${TY+30} ${DVX},${TY+16}`,'e');
+// PIC-101 column pressure
+const ipX=CX-40,ipY=CY+110;
+s+=instr(ipX,ipY,'PIC','101',true);
+s+=ln(CX,ipY,ipX+11,ipY,BK,LWfine);
 
-// FI-101: Flow indicator on feed
-const fiX=P1X+60,fiY=P1Y-35;
-s+=instr(fiX,fiY,'FI','101',false);
-s+=line(fiX,fiY+14,fiX,P1Y-10,'#333',1);
+// LIC-101 reflux drum → distillate valve
+const ilX=DrumX+65,ilY=DrumY+21;
+s+=instr(ilX,ilY,'LIC','101',true);
+s+=ln(DrumX+55,ilY,ilX-11,ilY,BK,LWfine);
+s+=sig(`${ilX},${ilY+11} ${ilX},${TEY+22} ${DVX},${TEY+22} ${DVX},${TEY+12}`);
 
-// TI-103: Temperature on distillate
-const ti3X=T2X-80,ti3Y=TY-30;
-s+=instr(ti3X,ti3Y,'TI','103',false);
-s+=line(ti3X,ti3Y+14,ti3X,TY-5,'#333',1);
+// FI-101 feed
+const ifX=P1X+50,ifY=P1Y-28;
+s+=instr(ifX,ifY,'FI','101',false);
+s+=ln(ifX,ifY+11,ifX,P1Y-8,BK,LWfine);
 
-// ===== LEGEND BOX =====
-const LX=30,LY=620,LW=290,LH=195;
-s+=rect(LX,LY,LW,LH,{f:'#fafafa',s:'#999',sw:1,r:4});
-s+=txt(LX+LW/2,LY+18,'LÉGENDE',10,{b:true});
-// Process line
-s+=line(LX+15,LY+38,LX+55,LY+38,BK,2.5);s+=txt(LX+65,LY+42,'Ligne process',8,{a:'start'});
-// Utility line
-s+=line(LX+15,LY+55,LX+55,LY+55,'#888',1.5,'stroke-dasharray="8,4"');s+=txt(LX+65,LY+59,'Ligne utilité',8,{a:'start'});
-// Signal line
-s+=line(LX+15,LY+72,LX+55,LY+72,'#333',0.8,'stroke-dasharray="6,3"');s+=txt(LX+65,LY+76,'Signal électrique',8,{a:'start'});
-// Instrument (field)
-s+=`<circle cx="${LX+25}" cy="${LY+93}" r="8" fill="#fff" stroke="${BK}" stroke-width="1.2"/>`;
-s+=txt(LX+65,LY+97,'Instrument terrain',8,{a:'start'});
-// Instrument (panel)
-s+=`<circle cx="${LX+25}" cy="${LY+113}" r="8" fill="#fff" stroke="${BK}" stroke-width="1.2"/>`;
-s+=line(LX+17,LY+113,LX+33,LY+113,BK,0.8);
-s+=txt(LX+65,LY+117,'Instrument salle contrôle',8,{a:'start'});
-// Control valve
-s+=`<polygon points="${LX+18},${LY+127} ${LX+25},${LY+135} ${LX+18},${LY+143}" fill="none" stroke="${BK}" stroke-width="1.2"/>`;
-s+=`<polygon points="${LX+32},${LY+127} ${LX+25},${LY+135} ${LX+32},${LY+143}" fill="none" stroke="${BK}" stroke-width="1.2"/>`;
-s+=txt(LX+65,LY+139,'Vanne de régulation',8,{a:'start'});
-// Manual valve
-s+=`<polygon points="${LX+18},${LY+150} ${LX+25},${LY+157} ${LX+18},${LY+164}" fill="${BK}" stroke="${BK}" stroke-width="1"/>`;
-s+=`<polygon points="${LX+32},${LY+150} ${LX+25},${LY+157} ${LX+32},${LY+164}" fill="${BK}" stroke="${BK}" stroke-width="1"/>`;
-s+=txt(LX+65,LY+161,'Vanne manuelle',8,{a:'start'});
-// PSV
-s+=`<polygon points="${LX+19},${LY+183} ${LX+25},${LY+172} ${LX+31},${LY+183}" fill="none" stroke="${SG}" stroke-width="1.5"/>`;
-s+=txt(LX+65,LY+181,'Soupape de sûreté (PSV)',8,{a:'start'});
-
-// ISA letter code table
-const TX2=LX+LW+20,TY2=LY;
-s+=rect(TX2,TY2,180,LH,{f:'#fafafa',s:'#999',sw:1,r:4});
-s+=txt(TX2+90,TY2+18,'CODIFICATION ISA 5.1',9,{b:true});
-const codes=[['T','Température'],['P','Pression'],['L','Niveau'],['F','Débit'],['I','Indicateur'],['C','Régulateur'],['IC','Ind. + Régulation'],['CV','Vanne de régulation'],['SV','Soupape sûreté']];
-codes.forEach((c,i)=>{
-  s+=txt(TX2+30,TY2+38+i*17,c[0],8,{b:true,a:'end'});
-  s+=txt(TX2+40,TY2+38+i*17,c[1],8,{a:'start',c:GR});
-});
+// ===== LEGEND (compact) =====
+const LBX=20,LBY=670,LBW=380,LBH=150;
+s+=rct(LBX,LBY,LBW,LBH,{f:'#fafafa',s:'#aaa',sw:0.8,r:3});
+s+=txt(LBX+95,LBY+14,'LÉGENDE',8,{b:true});
+const legY=LBY+28;
+s+=ln(LBX+12,legY,LBX+42,legY,BK,LW);s+=txt(LBX+48,legY+3,'Ligne process',6.5,{a:'start'});
+s+=ln(LBX+12,legY+15,LBX+42,legY+15,LG,LWutil,'stroke-dasharray="6,3"');s+=txt(LBX+48,legY+18,'Ligne utilité',6.5,{a:'start'});
+s+=ln(LBX+12,legY+30,LBX+42,legY+30,'#444',LWsig,'stroke-dasharray="4,2"');s+=txt(LBX+48,legY+33,'Signal',6.5,{a:'start'});
+s+=`<circle cx="${LBX+22}" cy="${legY+48}" r="6" fill="#fff" stroke="${BK}" stroke-width="0.8"/>`;s+=txt(LBX+48,legY+51,'Instrument terrain',6.5,{a:'start'});
+s+=`<circle cx="${LBX+22}" cy="${legY+63}" r="6" fill="#fff" stroke="${BK}" stroke-width="0.8"/>`;s+=ln(LBX+16,legY+63,LBX+28,legY+63,BK,0.5);s+=txt(LBX+48,legY+66,'Instrument salle contrôle',6.5,{a:'start'});
+s+=`<polygon points="${LBX+16},${legY+73} ${LBX+22},${legY+79} ${LBX+16},${legY+85}" fill="none" stroke="${BK}" stroke-width="0.8"/><polygon points="${LBX+28},${legY+73} ${LBX+22},${legY+79} ${LBX+28},${legY+85}" fill="none" stroke="${BK}" stroke-width="0.8"/>`;s+=txt(LBX+48,legY+82,'Vanne de régulation',6.5,{a:'start'});
+s+=`<polygon points="${LBX+16},${legY+90} ${LBX+22},${legY+95} ${LBX+16},${legY+100}" fill="${BK}"/><polygon points="${LBX+28},${legY+90} ${LBX+22},${legY+95} ${LBX+28},${legY+100}" fill="${BK}"/>`;s+=txt(LBX+48,legY+98,'Vanne manuelle',6.5,{a:'start'});
+s+=`<polygon points="${LBX+16},${legY+115} ${LBX+22},${legY+107} ${LBX+28},${legY+115}" fill="none" stroke="${SG}" stroke-width="1"/>`;s+=txt(LBX+48,legY+114,'PSV',6.5,{a:'start'});
+// ISA codes (right side of legend)
+s+=txt(LBX+250,LBY+14,'ISA 5.1',8,{b:true});
+const codes=[['T','Température'],['P','Pression'],['L','Niveau'],['F','Débit'],['I','Indicateur'],['C','Régulateur']];
+codes.forEach((c,i)=>{s+=txt(LBX+228,legY+3+i*14,c[0],6.5,{b:true,a:'end'})+txt(LBX+234,legY+3+i*14,c[1],6.5,{a:'start',c:GR})});
 
 svg.innerHTML=s;
 }
