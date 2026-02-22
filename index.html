@@ -904,9 +904,9 @@ function sig(pts){return pl(pts,'#444',LWsig,'stroke-dasharray="4,2"')}
 
 // ========= BUILD SVG =========
 let s=`<defs>
-<marker id="arr" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="${BK}"/></marker>
-<marker id="arrB" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="${PL}"/></marker>
-<marker id="arrR" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="${VL}"/></marker>
+<marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><polygon points="0 0,8 3,0 6" fill="${BK}"/></marker>
+<marker id="arrB" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><polygon points="0 0,8 3,0 6" fill="${PL}"/></marker>
+<marker id="arrR" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto" markerUnits="userSpaceOnUse"><polygon points="0 0,8 3,0 6" fill="${VL}"/></marker>
 </defs>`;
 
 // Border & title block
@@ -919,140 +919,128 @@ s+=txt(352,882,'xF='+r.xF+'  xD='+r.xD+'  xW='+r.xW+'  R='+r.R.toFixed(2),7,{c:L
 s+=txt(875,856,'DistillAI v2',9,{b:true})+txt(875,870,'ISO 14617 · ISA 5.1',7,{c:GR})+txt(875,882,new Date().toLocaleDateString('fr-FR'),7,{c:LG});
 s+=txt(1220,856,'Rév. 0',8,{b:true})+txt(1220,870,'N.T.S.',7,{c:GR})+txt(1220,882,'Feuille 1/1',7,{c:LG});
 
-// ===== LAYOUT =====
-const CX=460,CY=160,CW=55,CH=360;        // Column (narrower)
+// ===== LAYOUT COORDINATES =====
+const CX=460,CY=160,CW=55,CH=360;        // Column
 const ErebX=460,ErebY=620;                 // Reboiler
 const EcondX=720,EcondY=80;                // Condenser
-const DrumX=900,DrumY=140;                 // Reflux drum
+const DrumX=900,DrumY=140;                 // Reflux drum center
 const T1X=60,T1Y=310;                      // Feed tank
 const T2X=1210,T2Y=250;                    // Distillate tank
 const T3X=760,T3Y=660;                     // Residue tank
 const P1X=220,P1Y=420;                     // Feed pump
 const P2X=1040,P2Y=260;                    // Reflux pump
+const Np=Math.ceil(r.Nth)||8;
+const TEX=P2X+45,TEY=P2Y;                 // Tee after pump
+const DVX=(TEX+T2X-55)/2;                 // Distillate valve X
+const rfY=CY+30;                          // Reflux entry Y
 
-// --- T-101 Feed tank ---
+// ====================================================================
+// LAYER 1: BLUE/COLORED LINES — drawn first so they appear BEHIND black
+// ====================================================================
+// Feed line: T-101 → MV → P-101 → column (blue)
+s+=pl(`${T1X+100},${T1Y+90} ${P1X-18},${T1Y+90} ${P1X-18},${P1Y-1}`,PL,LW,'marker-end="url(#arrB)"');
+s+=pl(`${P1X+14},${P1Y} ${P1X+50},${P1Y} ${P1X+50},${CY+CH/2} ${CX+1},${CY+CH/2}`,PL,LW,'marker-end="url(#arrB)"');
+// Reflux line: tee → down → enters column side (blue) — BEHIND black condensate
+s+=pl(`${TEX},${TEY} ${TEX},${rfY} ${CX+CW+1},${rfY}`,PL,LW,'marker-end="url(#arrB)"');
+// Distillate line: tee → right → T-102 (blue)
+s+=pl(`${TEX},${TEY} ${T2X-55},${TEY} ${T2X-55},${T2Y+1}`,PL,LW,'marker-end="url(#arrB)"');
+
+// ====================================================================
+// LAYER 2: UTILITY LINES (dashed)
+// ====================================================================
+s+=util(`${ErebX-80},${ErebY+16} ${ErebX-36},${ErebY+16}`,VL);
+s+=util(`${ErebX+36},${ErebY+16} ${ErebX+80},${ErebY+16}`,VL);
+s+=util(`${EcondX-8},${EcondY-23} ${EcondX-8},${EcondY-42}`,CL);
+s+=util(`${EcondX+8},${EcondY-23} ${EcondX+8},${EcondY-42}`,CL);
+
+// ====================================================================
+// LAYER 3: BLACK PROCESS LINES — on top of blue
+// ====================================================================
+s+=pl(`${CX+CW/2},${CY+CH+6} ${CX+CW/2},${ErebY-23}`,BK,LW,'marker-end="url(#arr)"');
+s+=pl(`${ErebX+36},${ErebY-15} ${CX+CW+14},${ErebY-15} ${CX+CW+14},${CY+CH-25}`,BK,LW,'marker-end="url(#arr)"');
+s+=pl(`${CX+CW/2},${CY-6} ${CX+CW/2},${EcondY} ${EcondX-36},${EcondY}`,BK,LW,'marker-end="url(#arr)"');
+s+=pl(`${EcondX+36},${EcondY} ${DrumX-55},${EcondY} ${DrumX-55},${DrumY+1}`,BK,LW,'marker-end="url(#arr)"');
+s+=pl(`${DrumX},${DrumY+42} ${DrumX},${P2Y} ${P2X-14},${P2Y}`,BK,LW,'marker-end="url(#arr)"');
+s+=ln(P2X+14,P2Y,TEX,TEY,BK,LW);
+s+=`<circle cx="${TEX}" cy="${TEY}" r="2.5" fill="${BK}"/>`;
+s+=ln(DrumX+55,DrumY+8,DrumX+72,DrumY+8,BK,LWfine);
+s+=pl(`${CX+CW/2-12},${CY+CH+6} ${CX+CW/2-12},${CY+CH+30} ${T3X},${CY+CH+30} ${T3X},${T3Y+1}`,'#795548',LW,'marker-end="url(#arr)"');
+
+// ====================================================================
+// LAYER 4: SIGNAL LINES (dashed thin)
+// ====================================================================
+const i1X=CX-40,i1Y=CY+50;
+const i2X=CX-40,i2Y=CY+CH-50;
+const ipX=CX-40,ipY=CY+110;
+const ilX=DrumX+65,ilY=DrumY+21;
+const ifX=P1X+50,ifY=P1Y-28;
+s+=sig(`${i1X},${i1Y+12} ${i1X},${CY+70} ${TEX+12},${CY+70}`);
+s+=sig(`${i2X},${i2Y+12} ${i2X},${ErebY+40} ${ErebX-52},${ErebY+40} ${ErebX-52},${ErebY+28}`);
+s+=sig(`${ilX},${ilY+12} ${ilX},${TEY+22} ${DVX},${TEY+22} ${DVX},${TEY+12}`);
+
+// ====================================================================
+// LAYER 5: EQUIPMENT (white fills on top of all lines)
+// ====================================================================
 s+=tank(T1X,T1Y,100,120,'T-101','Bac de charge',r.vF+' L');
+s+=tank(T2X-105,T2Y,100,110,'T-102','Bac distillat',r.vD.toFixed(0)+' L');
+s+=tank(T3X-40,T3Y,80,90,'T-103','Résidu','');
 s+=ln(T1X-6,T1Y+25,T1X-6,T1Y+110,BK,0.7)+ln(T1X-10,T1Y+25,T1X-2,T1Y+25,BK,0.7)+ln(T1X-10,T1Y+110,T1X-2,T1Y+110,BK,0.7);
 s+=txt(T1X-16,T1Y+68,'LG',5.5,{c:GR});
-
-// --- P-101 Feed pump ---
-s+=pump(P1X,P1Y,'P-101');
-// Feed line: T-101 → MV → P-101 → column
-s+=pl(`${T1X+100},${T1Y+90} ${P1X-18},${T1Y+90} ${P1X-18},${P1Y}`,PL,LW,'marker-end="url(#arrB)"');
-s+=ln(P1X-18,P1Y,P1X-13,P1Y,PL,LW);
-s+=mv(T1X+120,T1Y+90);
-s+=pl(`${P1X+13},${P1Y} ${P1X+50},${P1Y} ${P1X+50},${CY+CH/2} ${CX},${CY+CH/2}`,PL,LW,'marker-end="url(#arrB)"');
-s+=txt(P1X+55,CY+CH/2-6,'CHARGE',5.5,{c:PL,a:'start'});
-s+=txt(P1X+15,P1Y-15,'2"-PL-001',5.5,{c:GR});
-
-// --- C-101 Column ---
-const Np=Math.ceil(r.Nth)||8;
 s+=column(CX,CY,CW,CH,'C-101','DN'+(r.Dstd*1000).toFixed(0)+' H='+r.Htot.toFixed(1)+'m',Np);
-
-// --- E-101 Reboiler ---
 s+=hx(ErebX,ErebY,'E-101',r.Qreb.toFixed(1)+' kW',true);
-// Column bottom → reboiler
-s+=pl(`${CX+CW/2},${CY+CH+6} ${CX+CW/2},${ErebY-25}`,BK,LW,'marker-end="url(#arr)"');
-// Reboiler vapor return
-s+=pl(`${ErebX+38},${ErebY-15} ${CX+CW+12},${ErebY-15} ${CX+CW+12},${CY+CH-25}`,BK,LW,'marker-end="url(#arr)"');
-s+=txt(CX+CW+16,CY+CH-45,'Vapeur',5.5,{c:VL,a:'start'});
-// Steam in/out
-s+=util(`${ErebX-70},${ErebY+16} ${ErebX-35},${ErebY+16}`,VL);
-s+=cv(ErebX-52,ErebY+16,'TCV-102',true);
-s+=txt(ErebX-75,ErebY+12,'Vap. '+r.stT+'°C',5.5,{c:VL,a:'end'});
-s+=util(`${ErebX+35},${ErebY+16} ${ErebX+75},${ErebY+16}`,VL);
-s+=txt(ErebX+80,ErebY+12,'Condensat',5.5,{c:VL,a:'start'});
-
-// --- Vapor line: column top → condenser ---
-s+=pl(`${CX+CW/2},${CY} ${CX+CW/2},${EcondY} ${EcondX-38},${EcondY}`,BK,LW,'marker-end="url(#arr)"');
-s+=txt(CX+CW/2+4,EcondY-8,'4"-PV-001',5.5,{c:GR,a:'start'});
-
-// --- E-102 Condenser ---
 s+=hx(EcondX,EcondY,'E-102',r.Qcond.toFixed(1)+' kW',true);
-s+=util(`${EcondX-8},${EcondY-25} ${EcondX-8},${EcondY-42}`,CL);
-s+=util(`${EcondX+8},${EcondY-25} ${EcondX+8},${EcondY-42}`,CL);
-s+=txt(EcondX,EcondY-48,'CW '+r.cwIn+'°C/'+r.cwOut+'°C',5.5,{c:CL});
-
-// Condensate → reflux drum
-s+=pl(`${EcondX+38},${EcondY} ${DrumX-55},${EcondY} ${DrumX-55},${DrumY}`,BK,LW,'marker-end="url(#arr)"');
-
-// --- D-101 Reflux drum ---
 s+=drum(DrumX-55,DrumY,110,42,'D-101','Ballon reflux');
-s+=ln(DrumX+55,DrumY+8,DrumX+72,DrumY+8,BK,LWfine);
-s+=txt(DrumX+76,DrumY+12,'Évent',5.5,{c:GR,a:'start'});
-
-// --- P-102 Reflux/distillate pump ---
+s+=pump(P1X,P1Y,'P-101');
 s+=pump(P2X,P2Y,'P-102');
-s+=pl(`${DrumX},${DrumY+42} ${DrumX},${P2Y} ${P2X-13},${P2Y}`,BK,LW,'marker-end="url(#arr)"');
 
-// Tee after pump
-const TEX=P2X+45,TEY=P2Y;
-s+=ln(P2X+13,P2Y,TEX,TEY,BK,LW);
-s+=`<circle cx="${TEX}" cy="${TEY}" r="2.5" fill="${BK}"/>`;
-
-// --- Reflux line: tee → down alongside column → enters column side ---
-// Route reflux BELOW the condenser/drum level, alongside column right side
-const rfY=CY+30; // reflux enters column near top
-s+=pl(`${TEX},${TEY} ${TEX},${rfY} ${CX+CW},${rfY}`,PL,LW,'marker-end="url(#arrB)"');
-s+=cv(TEX,CY+70,'FCV-101',false);
-s+=txt(TEX+14,CY+55,'R='+r.R.toFixed(2),5.5,{c:PL,a:'start'});
-
-// --- Distillate line: tee → right → T-102 ---
-s+=pl(`${TEX},${TEY} ${T2X-55},${TEY} ${T2X-55},${T2Y}`,PL,LW,'marker-end="url(#arrB)"');
-const DVX=(TEX+T2X-55)/2;
-s+=cv(DVX,TEY,'FCV-102',true);
-s+=txt(DVX,TEY-18,'2"-PL-003',5.5,{c:GR});
-
-// TI-103 on distillate line
-s+=instr(DVX+50,TEY-25,'TI','103',false);
-s+=ln(DVX+50,TEY-14,DVX+50,TEY-3,BK,LWfine);
-
-// --- T-102 Distillate tank ---
-s+=tank(T2X-105,T2Y,100,110,'T-102','Bac distillat',r.vD.toFixed(0)+' L');
-
-// --- Residue line ---
-s+=pl(`${CX+CW/2-12},${CY+CH+6} ${CX+CW/2-12},${CY+CH+30} ${T3X},${CY+CH+30} ${T3X},${T3Y}`,'#795548',LW,'marker-end="url(#arr)"');
+// ====================================================================
+// LAYER 6: VALVES (on top of lines)
+// ====================================================================
+s+=mv(T1X+120,T1Y+90);
 s+=mv(CX+CW/2+30,CY+CH+30);
-s+=txt(CX+CW/2+45,CY+CH+24,'2"-PL-004 Résidu',5.5,{c:GR,a:'start'});
+s+=cv(TEX,CY+70,'FCV-101',false);
+s+=cv(DVX,TEY,'FCV-102',true);
+s+=cv(ErebX-52,ErebY+16,'TCV-102',true);
 
-// --- T-103 Residue tank ---
-s+=tank(T3X-40,T3Y,80,90,'T-103','Résidu','');
-
-// ===== PSV =====
-s+=psv(CX+CW+30,CY+5,'PSV-101',(r.P*1.1/1000).toFixed(2)+' bar');
+// ====================================================================
+// LAYER 7: PSV
+// ====================================================================
 s+=ln(CX+CW,CY+15,CX+CW+23,CY+15,SG,LW);
-s+=ln(CX+CW+23,CY+15,CX+CW+23,CY+5+7,SG,LW);
+s+=ln(CX+CW+23,CY+15,CX+CW+23,CY+12,SG,LW);
+s+=psv(CX+CW+30,CY+5,'PSV-101',(r.P*1.1/1000).toFixed(2)+' bar');
 s+=ln(CX+CW+30,CY+5-23,CX+CW+30,CY+5-32,SG,LWfine);
 s+=txt(CX+CW+30,CY+5-37,'Évent sécurité',5.5,{c:SG});
 
-// ===== INSTRUMENTATION =====
-// TIC-101 top column → reflux valve
-const i1X=CX-40,i1Y=CY+50;
+// ====================================================================
+// LAYER 8: INSTRUMENTS (on top)
+// ====================================================================
 s+=instr(i1X,i1Y,'TIC','101',true);
-s+=ln(CX,i1Y,i1X+11,i1Y,BK,LWfine);
-s+=sig(`${i1X},${i1Y+11} ${i1X},${CY+70} ${TEX+12},${CY+70}`);
-
-// TIC-102 bottom column → steam valve
-const i2X=CX-40,i2Y=CY+CH-50;
+s+=ln(CX,i1Y,i1X+12,i1Y,BK,LWfine);
 s+=instr(i2X,i2Y,'TIC','102',true);
-s+=ln(CX,i2Y,i2X+11,i2Y,BK,LWfine);
-s+=sig(`${i2X},${i2Y+11} ${i2X},${ErebY+40} ${ErebX-52},${ErebY+40} ${ErebX-52},${ErebY+28}`);
-
-// PIC-101 column pressure
-const ipX=CX-40,ipY=CY+110;
+s+=ln(CX,i2Y,i2X+12,i2Y,BK,LWfine);
 s+=instr(ipX,ipY,'PIC','101',true);
-s+=ln(CX,ipY,ipX+11,ipY,BK,LWfine);
-
-// LIC-101 reflux drum → distillate valve
-const ilX=DrumX+65,ilY=DrumY+21;
+s+=ln(CX,ipY,ipX+12,ipY,BK,LWfine);
 s+=instr(ilX,ilY,'LIC','101',true);
-s+=ln(DrumX+55,ilY,ilX-11,ilY,BK,LWfine);
-s+=sig(`${ilX},${ilY+11} ${ilX},${TEY+22} ${DVX},${TEY+22} ${DVX},${TEY+12}`);
-
-// FI-101 feed
-const ifX=P1X+50,ifY=P1Y-28;
+s+=ln(DrumX+55,ilY,ilX-12,ilY,BK,LWfine);
 s+=instr(ifX,ifY,'FI','101',false);
-s+=ln(ifX,ifY+11,ifX,P1Y-8,BK,LWfine);
+s+=ln(ifX,ifY+12,ifX,P1Y-8,BK,LWfine);
+s+=instr(DVX+50,TEY-25,'TI','103',false);
+s+=ln(DVX+50,TEY-14,DVX+50,TEY-2,BK,LWfine);
+
+// ====================================================================
+// LAYER 9: LABELS & ANNOTATIONS (very top)
+// ====================================================================
+s+=txt(CX+CW+18,CY+CH-45,'Vapeur',5.5,{c:VL,a:'start'});
+s+=txt(ErebX-85,ErebY+12,'Vap. '+r.stT+'°C',5.5,{c:VL,a:'end'});
+s+=txt(ErebX+85,ErebY+12,'Condensat',5.5,{c:VL,a:'start'});
+s+=txt(EcondX,EcondY-48,'CW '+r.cwIn+'°C/'+r.cwOut+'°C',5.5,{c:CL});
+s+=txt(DrumX+76,DrumY+12,'Évent',5.5,{c:GR,a:'start'});
+s+=txt(P1X+55,CY+CH/2-6,'CHARGE',5.5,{c:PL,a:'start'});
+s+=txt(P1X+15,P1Y-15,'2"-PL-001',5.5,{c:GR});
+s+=txt(CX+CW/2+4,EcondY-8,'4"-PV-001',5.5,{c:GR,a:'start'});
+s+=txt(TEX+14,CY+55,'R='+r.R.toFixed(2),5.5,{c:PL,a:'start'});
+s+=txt(DVX,TEY-18,'2"-PL-003',5.5,{c:GR});
+s+=txt(CX+CW/2+45,CY+CH+24,'2"-PL-004 Résidu',5.5,{c:GR,a:'start'});
 
 // ===== LEGEND (compact) =====
 const LBX=20,LBY=670,LBW=380,LBH=150;
