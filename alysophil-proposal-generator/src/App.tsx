@@ -7,7 +7,6 @@ import { Step1ClientInfo } from './components/steps/Step1_ClientInfo';
 import { Step2Context } from './components/steps/Step2_Context';
 import { Step3TechSpecs } from './components/steps/Step3_TechSpecs';
 import { Step4Methodology } from './components/steps/Step4_Methodology';
-import { Step5StudyContent } from './components/steps/Step5_StudyContent';
 import { Step6Resources } from './components/steps/Step6_Resources';
 import { Step7Planning } from './components/steps/Step7_Planning';
 import { Step8Budget } from './components/steps/Step8_Budget';
@@ -18,7 +17,6 @@ const STEPS = [
   'clientInfo',
   'context',
   'techSpecs',
-  'methodology',
   'studyContent',
   'resources',
   'planning',
@@ -31,7 +29,6 @@ const STEP_COMPONENTS = [
   Step2Context,
   Step3TechSpecs,
   Step4Methodology,
-  Step5StudyContent,
   Step6Resources,
   Step7Planning,
   Step8Budget,

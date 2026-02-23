@@ -125,6 +125,7 @@ interface ProposalStore {
 
   // Tech specs
   addTechSpec: () => void;
+  addTechSpecWithData: (data: { text: string; included: boolean; feasibility: 'green' | 'yellow' | 'red' }) => void;
   removeTechSpec: (id: string) => void;
   updateTechSpec: (id: string, updates: Partial<TechSpec>) => void;
 
@@ -202,6 +203,17 @@ export const useProposalStore = create<ProposalStore>()((set, get) => ({
         techSpecs: [
           ...state.data.techSpecs,
           { id: uid(), text: '', included: true, feasibility: 'green' },
+        ],
+      },
+    })),
+
+  addTechSpecWithData: (specData) =>
+    set((state) => ({
+      data: {
+        ...state.data,
+        techSpecs: [
+          ...state.data.techSpecs,
+          { id: uid(), ...specData },
         ],
       },
     })),

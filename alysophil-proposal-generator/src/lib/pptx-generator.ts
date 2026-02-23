@@ -257,14 +257,15 @@ function addSlideTitle(
   });
 }
 
-/** Add small Alysophil logo in top-right corner. */
+/** Add small Alysophil logo in top-right corner. (501x300, ratio 1.67:1) */
 function addCornerLogo(slide: Slide): void {
   slide.addImage({
     data: logo_alysophil,
     x: 11.0,
-    y: 0.15,
+    y: 0.1,
     w: 2.0,
-    h: 0.55,
+    h: 1.2, // 2.0 / 1.67 = 1.20 preserves aspect ratio
+    sizing: { type: 'contain', w: 2.0, h: 1.2 },
   });
 }
 
@@ -352,13 +353,14 @@ function buildCoverSlide(pptx: PptxGenJS, data: ProposalData): void {
     color: COLORS.darkBlue,
   });
 
-  // Logo on right side
+  // Logo on right side (501x300, ratio 1.67:1)
   slide.addImage({
     data: logo_alysophil,
-    x: 8.5,
-    y: 0.8,
-    w: 4.0,
-    h: 1.1,
+    x: 9.0,
+    y: 0.6,
+    w: 3.5,
+    h: 2.1, // 3.5 / 1.67 = 2.10 to preserve aspect ratio
+    sizing: { type: 'contain', w: 3.5, h: 2.1 },
   });
 
   // Decorative rectangles bottom-right
@@ -602,13 +604,14 @@ function buildPredictionSlide1(pptx: PptxGenJS, data: ProposalData): void {
     wrap: true,
   });
 
-  // QSPR diagram image on right
+  // QSPR diagram image on right (2128x783 → wide format, maintain aspect ratio)
   slide.addImage({
     data: qspr_diagram,
     x: 7.3,
-    y: 1.7,
+    y: 2.0,
     w: 5.5,
-    h: 4.5,
+    h: 2.02, // 5.5 * (783/2128) to preserve aspect ratio
+    sizing: { type: 'contain', w: 5.5, h: 2.02 },
   });
 
   addConfidentialFooter(slide, lang);
@@ -645,7 +648,8 @@ function buildPredictionSlide2(pptx: PptxGenJS, data: ProposalData): void {
     x: colLeftX + 0.3,
     y: 1.8,
     w: 5.2,
-    h: 3.5,
+    h: 3.68, // 5.2 * (744/1052) = 3.68 preserves aspect ratio
+    sizing: { type: 'contain', w: 5.2, h: 3.68 },
   });
 
   // Input/Output labels left
@@ -694,10 +698,11 @@ function buildPredictionSlide2(pptx: PptxGenJS, data: ProposalData): void {
 
   slide.addImage({
     data: reverse_qspr,
-    x: colRightX + 0.3,
+    x: colRightX + 0.9,
     y: 1.8,
-    w: 5.2,
-    h: 3.5,
+    w: 3.5,
+    h: 3.57, // 3.5 * (434/426) = 3.57 preserves aspect ratio (nearly square image)
+    sizing: { type: 'contain', w: 3.5, h: 3.57 },
   });
 
   // Input/Output labels right (reversed)
@@ -753,13 +758,14 @@ function buildChallengesSlide(pptx: PptxGenJS, data: ProposalData): void {
     wrap: true,
   });
 
-  // Polymer multiscale image on right
+  // Polymer multiscale image on right (3226x1572, ratio 2.05:1)
   slide.addImage({
     data: polymer_multiscale,
     x: 7.8,
-    y: 1.3,
+    y: 1.8,
     w: 5.0,
-    h: 4.0,
+    h: 2.44, // 5.0 / 2.05 = 2.44 preserves aspect ratio
+    sizing: { type: 'contain', w: 5.0, h: 2.44 },
   });
 
   // Caption below image
