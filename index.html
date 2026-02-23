@@ -149,6 +149,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
     <div class="card"><div class="card-title">⏱️ Bilan matière & temps</div><div class="rg" id="rMa"></div></div>
   </div>
   <div class="card"><div class="card-title">🔧 Auxiliaires</div><div class="rg" id="rAux"></div></div>
+  <div class="card"><div class="card-title">🔬 Vérification hydraulique échangeurs</div><div id="rHx"></div></div>
   <div class="card"><div class="card-title">🛡️ Sécurité</div><div id="rSaf"></div></div>
 </div>
 <!-- P&ID -->
@@ -793,6 +794,70 @@ function doCalc(l,h,lk,hk){
   const lmtdC=((Ttop-cwOut)-(Ttop-cwIn))/Math.log(Math.max((Ttop-cwOut)/(Ttop-cwIn),.01)),Acond=Qreb>0?Qcond*1000/(800*Math.max(lmtdC,1)):0;
   const lmtdR=Math.max(stT-Tbot,1),Areb=Qreb>0?Qreb*1000/(1000*lmtdR):0;
 
+  // ===== Heat Exchanger Hydraulic Verification (Shell & Tube - TEMA) =====
+  function hxHydraulic(Ahx,Qhx,fluidHot,fluidCold,isReboiler){
+    // Tube geometry (3/4" OD, 16 BWG, triangular pitch 1")
+    const dTo=0.01905,dTi=0.01575,Ltu=2.0,pitch=0.0254,Npass=isReboiler?1:2;
+    const bafCut=0.25; // 25% baffle cut
+    // Fluid properties
+    var muT,rhoT,cpT,kT,mDotT; // tube side
+    var muS,rhoS,cpS,kS,mDotS; // shell side
+    if(isReboiler){
+      // Reboiler: steam on shell (condensing), process on tube
+      muT=xF*l.mu+(1-xF)*h.mu; rhoT=rhoD*1000; cpT=xF*l.cp+(1-xF)*h.cp; kT=0.15;
+      mDotT=Qhx>0?Qhx*1000/(cpT*Math.max(Tbot-Tfeed,10)):0.1;
+      muS=0.00028; rhoS=1.5; cpS=2100; kS=0.025; mDotS=stFlow/3600;
+    } else {
+      // Condenser: process vapor on shell, cooling water on tube
+      muT=0.001; rhoT=998; cpT=4180; kT=0.6; mDotT=cwFlow/3600;
+      muS=0.00035; rhoS=rhoV>0.5?rhoV:2.0; cpS=hvAvg>0?1800:1500; kS=0.02;
+      mDotS=totVapMol>0?Vmr*MWd/1000:0.01;
+    }
+    // Number of tubes from area
+    const aPerTube=Math.PI*dTo*Ltu,Ntu=Math.max(4,Math.ceil(Ahx/Math.max(aPerTube,0.001)));
+    // Shell diameter auto-sizing (iterative to meet ΔP < 50 kPa)
+    const aTubeFlow=Math.PI*dTi*dTi/4*Ntu/Npass;
+    const vTube=mDotT/(rhoT*Math.max(aTubeFlow,1e-6));
+    const ReTube=rhoT*Math.abs(vTube)*dTi/Math.max(muT,1e-8);
+    // Tube-side ΔP (Darcy-Weisbach + return losses)
+    const fT=ReTube>0?(ReTube>2100?0.316*Math.pow(ReTube,-0.25):64/Math.max(ReTube,1)):0.05;
+    const dpTube=fT*(Ltu*Npass)/dTi*rhoT*vTube*vTube/2 + Npass*1.5*rhoT*vTube*vTube/2;
+    // Shell diameter: start from TEMA minimum, iterate up until ΔP_shell < 50 kPa
+    const stdShell=[0.154,0.203,0.254,0.305,0.337,0.387,0.438,0.489,0.540,0.591,0.635,0.686,0.737,0.787,0.838,0.889,0.940,0.991,1.067];
+    // Minimum shell diameter from tube count (CTP=0.93, CL=1.0 for triangular)
+    const Dmin=0.637*Math.sqrt(1.0/0.93)*dTo*Math.sqrt(Ntu);
+    var Ds=stdShell.find(d=>d>=Dmin)||stdShell[stdShell.length-1];
+    var dpShell=0,vShell=0,ReShell=0,bafSpace=0,aShell=0,shellOK=false;
+    for(let si=stdShell.indexOf(Ds);si<stdShell.length;si++){
+      Ds=stdShell[si];
+      bafSpace=Math.max(0.2*Ds,0.05); // baffle spacing ~ 0.2*Ds min 50mm
+      bafSpace=Math.min(bafSpace,Ds); // max = Ds
+      if(bafSpace<0.05)bafSpace=0.05;
+      const Nb=Math.max(1,Math.floor(Ltu/bafSpace)-1);
+      // Shell-side flow area (Kern method)
+      aShell=Ds*bafSpace*(1-dTo/pitch);
+      vShell=mDotS/(rhoS*Math.max(aShell,1e-6));
+      // Equivalent diameter for triangular pitch
+      const De=4*(0.5*pitch*0.866*pitch-0.5*Math.PI*dTo*dTo/4)/(0.5*Math.PI*dTo);
+      ReShell=rhoS*Math.abs(vShell)*Math.max(De,0.001)/Math.max(muS,1e-8);
+      // Shell-side ΔP (Kern correlation)
+      const fS=ReShell>0?Math.exp(0.576-0.19*Math.log(ReShell)):0.5;
+      dpShell=fS*Ds*(Nb+1)/(Math.max(De,0.001))*rhoS*vShell*vShell/2;
+      dpShell=Math.abs(dpShell);
+      if(dpShell<=50000){shellOK=true;break}
+    }
+    return {
+      Ntu,Ds:Ds,Ltu,dTo,dTi,Npass,
+      vTube:Math.abs(vTube),vShell:Math.abs(vShell),
+      ReTube:Math.abs(ReTube),ReShell:Math.abs(ReShell),
+      dpTube:Math.abs(dpTube)/1000, // kPa
+      dpShell:dpShell/1000,          // kPa
+      shellOK,bafSpace,aShell
+    };
+  }
+  const hxReb=Areb>0?hxHydraulic(Areb,Qreb,true,false,true):{Ntu:0,Ds:0,Ltu:2,dTo:0.019,dTi:0.016,Npass:1,vTube:0,vShell:0,ReTube:0,ReShell:0,dpTube:0,dpShell:0,shellOK:true,bafSpace:0,aShell:0};
+  const hxCond=Acond>0?hxHydraulic(Acond,Qcond,false,true,false):{Ntu:0,Ds:0,Ltu:2,dTo:0.019,dTi:0.016,Npass:2,vTube:0,vShell:0,ReTube:0,ReShell:0,dpTube:0,dpShell:0,shellOK:true,bafSpace:0,aShell:0};
+
   // Dynamic simulation (Rayleigh)
   const steps=100,sim=[];let Wc=nF,xc=xF;
   for(let i=0;i<=steps;i++){
@@ -817,7 +882,7 @@ function doCalc(l,h,lk,hk){
   saf.push('Rétention ≥ 110% volume bouilleur');
   saf.push('TI tête/pied, PI tête, LI bouilleur, FCV reflux/distillat');
 
-  R_={l,h,lk,hk,xF,xD,xW,P,R,Rmin,alpha,Nmin,Nth,Nact,eta,hetp,Hpack,Htot,Dstd,Dc,mF,nF,mD,vD,mW,nD,nW,Qsen,Qvap,Qtot,Qreb,Qcond,tBatch,dPtot,Ttop,Tbot,stFlow,cwFlow,Acond,Areb,intType,mat,rpol,vF,MWf,rhoF,sim,saf,allH,Tbub,stT,cwIn,cwOut,MWd,rhoD,model,azeos};
+  R_={l,h,lk,hk,xF,xD,xW,P,R,Rmin,alpha,Nmin,Nth,Nact,eta,hetp,Hpack,Htot,Dstd,Dc,mF,nF,mD,vD,mW,nD,nW,Qsen,Qvap,Qtot,Qreb,Qcond,tBatch,dPtot,Ttop,Tbot,stFlow,cwFlow,Acond,Areb,intType,mat,rpol,vF,MWf,rhoF,sim,saf,allH,Tbub,stT,cwIn,cwOut,MWd,rhoD,model,azeos,hxReb,hxCond};
   showResults();drawPID();drawCharts();drawAnim(0);drawMcCabe();genReport();sp('results');
 }
 
@@ -828,8 +893,41 @@ function showResults(){const r=R_;
   document.getElementById('rCol').innerHTML=rc((r.Dstd*1000).toFixed(0),'Diamètre','mm')+rc(r.Htot.toFixed(1),'Hauteur totale','m')+rc(r.Hpack.toFixed(1),'Hauteur garnissage','m')+rc(Math.ceil(r.Nth),'Plateaux théoriques','')+rc(r.Nact,'Plateaux réels','')+rc(r.alpha.toFixed(2),'α moyen','')+rc((r.hetp*100).toFixed(0),'HETP','cm')+rc(r.dPtot.toFixed(1),'ΔP totale','kPa');
   document.getElementById('rTh').innerHTML=rc(r.Qreb.toFixed(1),'Bouilleur','kW')+rc(r.Qcond.toFixed(1),'Condenseur','kW')+rc((r.Qtot/1000).toFixed(1),'Énergie batch','MJ')+rc(r.Ttop.toFixed(1),'T° tête','°C')+rc(r.Tbot.toFixed(1),'T° pied','°C');
   document.getElementById('rMa').innerHTML=rc(r.mF.toFixed(1),'Charge','kg')+rc(r.mD.toFixed(1),'Distillat','kg')+rc(r.vD.toFixed(1),'Vol. distillat','L')+rc(r.mW.toFixed(1),'Résidu','kg')+rc(r.R.toFixed(2),'Reflux R','')+rc((r.tBatch*60).toFixed(0),'Durée','min');
-  document.getElementById('rAux').innerHTML=rc(r.stFlow.toFixed(1),'Vapeur 3 bar','kg/h')+rc(r.cwFlow.toFixed(0),'Eau refroid.','kg/h')+rc(r.Acond.toFixed(2),'S condenseur','m²')+rc(r.Areb.toFixed(2),'S bouilleur','m²');
+  document.getElementById('rAux').innerHTML=rc(r.stFlow.toFixed(1),'Vapeur 3 bar','kg/h')+rc(r.cwFlow.toFixed(0),'Eau refroid.','kg/h')+rc(r.Acond.toFixed(2),'S condenseur','m²')+rc(r.Areb.toFixed(2),'S bouilleur','m²')+rc(r.hxReb.Ntu,'Tubes bouilleur','')+rc(Math.round(r.hxReb.Ds*1000),'Ø calandre E-101','mm')+rc(r.hxCond.Ntu,'Tubes condenseur','')+rc(Math.round(r.hxCond.Ds*1000),'Ø calandre E-102','mm');
   document.getElementById('rSaf').innerHTML=r.saf.map(s=>'<div style="padding:.45rem 0;border-bottom:1px solid var(--brd);font-size:.88rem">'+s+'</div>').join('');
+  // Hydraulic verification display
+  function hxRow(label,val,unit,limit,high){
+    const v=typeof val==='number'?val:parseFloat(val);
+    const ok=limit?v<=limit:true;
+    const warn=high?v>=high:false;
+    const c=!ok?'#ef4444':warn?'#f59e0b':'#22c55e';
+    return'<tr><td style="padding:.4rem .6rem;font-size:.85rem">'+label+'</td><td style="padding:.4rem .6rem;font-weight:600;color:'+c+';font-size:.85rem">'+
+      (typeof val==='number'?val.toFixed(2):val)+'</td><td style="padding:.4rem .6rem;font-size:.82rem;color:#64748b">'+unit+'</td></tr>';
+  }
+  function hxBlock(title,hx,isReb){
+    if(!hx||hx.Ntu===0)return'<div style="color:#94a3b8;font-size:.85rem;padding:.5rem">Pas de données</div>';
+    const reLabel=hx.ReTube>4000?'Turbulent':hx.ReTube>2100?'Transition':'Laminaire';
+    const reSLabel=hx.ReShell>1000?'Turbulent':'Laminaire';
+    let s='<div style="margin-bottom:1rem"><div style="font-weight:600;font-size:.9rem;margin-bottom:.5rem;color:#334155">'+title+'</div>';
+    s+='<table style="width:100%;border-collapse:collapse">';
+    s+='<tr style="background:#f1f5f9"><th style="text-align:left;padding:.4rem .6rem;font-size:.78rem;color:#64748b">Paramètre</th><th style="text-align:left;padding:.4rem .6rem;font-size:.78rem;color:#64748b">Valeur</th><th style="text-align:left;padding:.4rem .6rem;font-size:.78rem;color:#64748b">Unité</th></tr>';
+    s+=hxRow('Nbre tubes',hx.Ntu,'');
+    s+=hxRow('Ø calandre',(hx.Ds*1000).toFixed(0),'mm');
+    s+=hxRow('Longueur tubes',(hx.Ltu*1000).toFixed(0),'mm');
+    s+=hxRow('Passes tubes',hx.Npass,'');
+    s+=hxRow('Vitesse tubes',hx.vTube.toFixed(2),'m/s',3.0,1.5);
+    s+=hxRow('Vitesse calandre',hx.vShell.toFixed(2),'m/s',2.5,1.0);
+    s+=hxRow('Re tubes',hx.ReTube.toFixed(0)+' <span style="font-size:.75rem;font-weight:400">('+reLabel+')</span>','');
+    s+=hxRow('Re calandre',hx.ReShell.toFixed(0)+' <span style="font-size:.75rem;font-weight:400">('+reSLabel+')</span>','');
+    s+=hxRow('ΔP tubes',hx.dpTube.toFixed(1),'kPa',70,30);
+    s+=hxRow('ΔP calandre',hx.dpShell.toFixed(1),'kPa',50,20);
+    s+='</table>';
+    if(!hx.shellOK)s+='<div style="color:#ef4444;font-size:.82rem;margin-top:.4rem;padding:.3rem .5rem;background:#fef2f2;border-radius:6px">⚠ ΔP calandre élevée — diamètre calandre max atteint ('+Math.round(hx.Ds*1000)+' mm). Réduire le débit ou augmenter la surface.</div>';
+    else s+='<div style="color:#22c55e;font-size:.82rem;margin-top:.4rem;padding:.3rem .5rem;background:#f0fdf4;border-radius:6px">✓ Vérification hydraulique OK — Ds auto-dimensionné à '+Math.round(hx.Ds*1000)+' mm</div>';
+    s+='</div>';
+    return s;
+  }
+  document.getElementById('rHx').innerHTML=hxBlock('E-101 — Bouilleur (kettle)',r.hxReb,true)+hxBlock('E-102 — Condenseur',r.hxCond,false);
 }
 
 // ===== P&ID =====
@@ -1684,7 +1782,14 @@ function genReport(){const r=R_;
     'Vapeur 3 bar ('+r.stT+'°C) : '+r.stFlow.toFixed(1)+' kg/h<br>'+
     'Eau refroidissement ('+r.cwIn+'→'+r.cwOut+'°C) : '+r.cwFlow.toFixed(0)+' kg/h<br>'+
     'Surface condenseur : '+r.Acond.toFixed(2)+' m² | Surface bouilleur : '+r.Areb.toFixed(2)+' m²<br>'+
-    'Durée estimée du batch : '+(r.tBatch*60).toFixed(0)+' min</p></div>'+
+    'Durée estimée du batch : '+(r.tBatch*60).toFixed(0)+' min</p>'+
+    '<h4 style="margin-top:.8rem">Vérification hydraulique (méthode Kern)</h4>'+
+    '<p><strong>E-101 Bouilleur :</strong> '+r.hxReb.Ntu+' tubes, Ø calandre '+Math.round(r.hxReb.Ds*1000)+' mm, '+
+    'v<sub>tubes</sub>='+r.hxReb.vTube.toFixed(2)+' m/s, v<sub>calandre</sub>='+r.hxReb.vShell.toFixed(2)+' m/s, '+
+    'ΔP<sub>tubes</sub>='+r.hxReb.dpTube.toFixed(1)+' kPa, ΔP<sub>calandre</sub>='+r.hxReb.dpShell.toFixed(1)+' kPa '+(r.hxReb.shellOK?'✓':'⚠')+'<br>'+
+    '<strong>E-102 Condenseur :</strong> '+r.hxCond.Ntu+' tubes, Ø calandre '+Math.round(r.hxCond.Ds*1000)+' mm, '+
+    'v<sub>tubes</sub>='+r.hxCond.vTube.toFixed(2)+' m/s, v<sub>calandre</sub>='+r.hxCond.vShell.toFixed(2)+' m/s, '+
+    'ΔP<sub>tubes</sub>='+r.hxCond.dpTube.toFixed(1)+' kPa, ΔP<sub>calandre</sub>='+r.hxCond.dpShell.toFixed(1)+' kPa '+(r.hxCond.shellOK?'✓':'⚠')+'</p></div>'+
     '<div class="rs"><h3>7. Sécurité & Recommandations</h3>'+
     '<p>Dangers identifiés : '+r.allH.join(', ')+'</p>'+
     r.saf.map(s=>'<p style="padding:.2rem 0">'+s+'</p>').join('')+
