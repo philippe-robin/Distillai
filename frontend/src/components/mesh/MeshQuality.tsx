@@ -14,7 +14,7 @@ interface MeshQualityProps {
 
 export function MeshQuality({ mesh }: MeshQualityProps) {
   // Convert histogram to chart data
-  const histogramData = mesh.quality_histogram.map((count, i) => ({
+  const histogramData = (mesh.quality_histogram ?? []).map((count, i) => ({
     range: `${(i * 0.1).toFixed(1)}-${((i + 1) * 0.1).toFixed(1)}`,
     count,
   }));
@@ -23,28 +23,28 @@ export function MeshQuality({ mesh }: MeshQualityProps) {
     <div className="space-y-3">
       {/* Stats cards */}
       <div className="grid grid-cols-2 gap-2">
-        <StatCard label="Elements" value={mesh.element_count.toLocaleString()} />
-        <StatCard label="Nodes" value={mesh.node_count.toLocaleString()} />
+        <StatCard label="Elements" value={mesh.element_count?.toLocaleString() ?? "—"} />
+        <StatCard label="Nodes" value={mesh.node_count?.toLocaleString() ?? "—"} />
         <StatCard
           label="Min Quality"
-          value={mesh.min_quality.toFixed(3)}
-          color={mesh.min_quality < 0.2 ? "text-error" : "text-success"}
+          value={mesh.min_quality?.toFixed(3) ?? "—"}
+          color={mesh.min_quality != null && mesh.min_quality < 0.2 ? "text-error" : "text-success"}
         />
         <StatCard
           label="Avg Quality"
-          value={mesh.avg_quality.toFixed(3)}
-          color={mesh.avg_quality < 0.5 ? "text-warning" : "text-success"}
+          value={mesh.avg_quality?.toFixed(3) ?? "—"}
+          color={mesh.avg_quality != null && mesh.avg_quality < 0.5 ? "text-warning" : "text-success"}
         />
       </div>
 
       {/* Patches */}
-      {mesh.patches.length > 0 && (
+      {(mesh.patches ?? []).length > 0 && (
         <div>
           <p className="mb-1 text-xs text-text-secondary">
-            Patches ({mesh.patches.length})
+            Patches ({(mesh.patches ?? []).length})
           </p>
           <div className="flex flex-wrap gap-1">
-            {mesh.patches.map((patch) => (
+            {(mesh.patches ?? []).map((patch) => (
               <span
                 key={patch}
                 className="rounded bg-bg-primary px-2 py-0.5 text-xs text-text-secondary"

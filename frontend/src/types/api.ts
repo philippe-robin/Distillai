@@ -92,22 +92,24 @@ export interface SimulationUpdate {
 export enum GeometryFormat {
   STL = "stl",
   STEP = "step",
-  OBJ = "obj",
+  Primitive = "primitive",
 }
 
 export interface Geometry {
   id: string;
   simulation_id: string;
-  filename: string;
+  filename: string | null;
   format: GeometryFormat;
-  file_size: number;
+  file_size: number | null;
   bounding_box: {
     min: [number, number, number];
     max: [number, number, number];
-  };
-  face_count: number;
-  vertex_count: number;
+  } | null;
+  face_count: number | null;
+  vertex_count: number | null;
+  primitive_config: Record<string, unknown> | null;
   created_at: string;
+  updated_at: string;
 }
 
 // ── Mesh ─────────────────────────────────────────────────────
@@ -135,14 +137,16 @@ export interface MeshGenerateRequest {
 export interface Mesh {
   id: string;
   simulation_id: string;
-  element_count: number;
-  node_count: number;
-  min_quality: number;
-  avg_quality: number;
-  max_quality: number;
-  quality_histogram: number[];
-  patches: string[];
+  element_count: number | null;
+  node_count: number | null;
+  min_quality: number | null;
+  avg_quality: number | null;
+  max_quality: number | null;
+  quality_histogram: number[] | null;
+  patches: string[] | null;
+  mesh_config: Record<string, unknown> | null;
   created_at: string;
+  updated_at?: string;
 }
 
 // ── Physics ──────────────────────────────────────────────────

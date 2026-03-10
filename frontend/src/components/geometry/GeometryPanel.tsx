@@ -49,7 +49,7 @@ export function GeometryPanel() {
               <div className="mb-2 flex items-center gap-2">
                 <FileBox size={16} className="text-accent" />
                 <span className="text-sm font-medium text-text-primary">
-                  {geometry.filename}
+                  {geometry.filename ?? "geometry"}
                 </span>
               </div>
 
@@ -63,24 +63,25 @@ export function GeometryPanel() {
                 <div>
                   <span className="text-text-secondary">Size:</span>
                   <span className="ml-1 text-text-primary">
-                    {formatFileSize(geometry.file_size)}
+                    {geometry.file_size != null ? formatFileSize(geometry.file_size) : "—"}
                   </span>
                 </div>
                 <div>
                   <span className="text-text-secondary">Faces:</span>
                   <span className="ml-1 text-text-primary">
-                    {geometry.face_count.toLocaleString()}
+                    {geometry.face_count?.toLocaleString() ?? "—"}
                   </span>
                 </div>
                 <div>
                   <span className="text-text-secondary">Vertices:</span>
                   <span className="ml-1 text-text-primary">
-                    {geometry.vertex_count.toLocaleString()}
+                    {geometry.vertex_count?.toLocaleString() ?? "—"}
                   </span>
                 </div>
               </div>
 
               {/* Bounding box */}
+              {geometry.bounding_box && (
               <div className="mt-2 border-t border-border pt-2">
                 <span className="text-xs text-text-secondary">
                   Bounding Box:
@@ -89,32 +90,33 @@ export function GeometryPanel() {
                   <div className="text-center">
                     <span className="text-red-400">X</span>
                     <div className="text-text-secondary">
-                      {geometry.bounding_box.min[0].toFixed(3)}
+                      {geometry.bounding_box.min[0]?.toFixed(3) ?? "—"}
                     </div>
                     <div className="text-text-primary">
-                      {geometry.bounding_box.max[0].toFixed(3)}
+                      {geometry.bounding_box.max[0]?.toFixed(3) ?? "—"}
                     </div>
                   </div>
                   <div className="text-center">
                     <span className="text-green-400">Y</span>
                     <div className="text-text-secondary">
-                      {geometry.bounding_box.min[1].toFixed(3)}
+                      {geometry.bounding_box.min[1]?.toFixed(3) ?? "—"}
                     </div>
                     <div className="text-text-primary">
-                      {geometry.bounding_box.max[1].toFixed(3)}
+                      {geometry.bounding_box.max[1]?.toFixed(3) ?? "—"}
                     </div>
                   </div>
                   <div className="text-center">
                     <span className="text-blue-400">Z</span>
                     <div className="text-text-secondary">
-                      {geometry.bounding_box.min[2].toFixed(3)}
+                      {geometry.bounding_box.min[2]?.toFixed(3) ?? "—"}
                     </div>
                     <div className="text-text-primary">
-                      {geometry.bounding_box.max[2].toFixed(3)}
+                      {geometry.bounding_box.max[2]?.toFixed(3) ?? "—"}
                     </div>
                   </div>
                 </div>
               </div>
+              )}
             </div>
 
             {/* Actions */}

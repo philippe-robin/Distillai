@@ -61,8 +61,8 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
         const geo = await geoApi.getGeometryBySimulation(sim.id);
         set({ geometry: geo });
 
-        // Download and parse STL for 3D preview
-        if (geo.format === "stl") {
+        // Download and parse STL for 3D preview (stl and primitive formats both store STL files)
+        if (geo.format === "stl" || geo.format === "primitive") {
           try {
             const blob = await geoApi.downloadGeometry(geo.id);
             const buffer = await blob.arrayBuffer();
