@@ -12,6 +12,7 @@ import { PhysicsPanel } from "@/components/physics/PhysicsPanel";
 import { ComputePanel } from "@/components/compute/ComputePanel";
 import { ResultsPanel } from "@/components/results/ResultsPanel";
 import { Spinner } from "@/components/common/Spinner";
+import { ErrorBoundary } from "@/components/common/ErrorBoundary";
 import { useSimulationStore } from "@/stores/simulationStore";
 import { useWorkflowStore } from "@/stores/workflowStore";
 import { useWebSocket } from "@/hooks/useWebSocket";
@@ -108,31 +109,33 @@ export function WorkspacePage() {
   ];
 
   return (
-    <div className="flex flex-1 overflow-hidden">
-      {/* Left sidebar */}
-      <Sidebar>
-        <WorkflowStepper />
-        <div className="flex-1 overflow-y-auto">{panels[currentStep]}</div>
-      </Sidebar>
+    <ErrorBoundary>
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left sidebar */}
+        <Sidebar>
+          <WorkflowStepper />
+          <div className="flex-1 overflow-y-auto">{panels[currentStep]}</div>
+        </Sidebar>
 
-      {/* 3D Viewport */}
-      <Viewport3D>
-        {/* Auto-frame camera when geometry loads */}
-        <CameraFramer vertices={stlData?.vertices ?? null} />
+        {/* 3D Viewport */}
+        <Viewport3D>
+          {/* Auto-frame camera when geometry loads */}
+          <CameraFramer vertices={stlData?.vertices ?? null} />
 
-        {/* Render geometry if we have STL data */}
-        {stlData && (
-          <GeometryRenderer
-            vertices={stlData.vertices}
-            normals={stlData.normals}
-          />
-        )}
+          {/* Render geometry if we have STL data */}
+          {stlData && (
+            <GeometryRenderer
+              vertices={stlData.vertices}
+              normals={stlData.normals}
+            />
+          )}
 
-        {/* Render mesh wireframe overlay */}
-        {stlData && currentStep >= 1 && (
-          <MeshRenderer vertices={stlData.vertices} />
-        )}
-      </Viewport3D>
-    </div>
+          {/* Render mesh wireframe overlay */}
+          {stlData && currentStep >= 1 && (
+            <MeshRenderer vertices={stlData.vertices} />
+          )}
+        </Viewport3D>
+      </div>
+    </ErrorBoundary>
   );
 }
