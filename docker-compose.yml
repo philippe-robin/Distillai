@@ -1,0 +1,99 @@
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/frontend.Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/app:/app/app
+    environment:
+      DATABASE_URL: postgresql+asyncpg://alchemsim:alchemsim@postgres:5432/alchemsim
+      DATABASE_URL_SYNC: postgresql://alchemsim:alchemsim@postgres:5432/alchemsim
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: alchemsim
+      JWT_SECRET: dev-secret-change-in-production
+      CORS_ORIGINS: '["http://localhost:5173"]'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: ../docker/backend.Dockerfile
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+    volumes:
+      - ./backend/app:/app/app
+      - solver-data:/data/solver
+    environment:
+      DATABASE_URL: postgresql+asyncpg://alchemsim:alchemsim@postgres:5432/alchemsim
+      DATABASE_URL_SYNC: postgresql://alchemsim:alchemsim@postgres:5432/alchemsim
+      REDIS_URL: redis://redis:6379/0
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: alchemsim
+      JWT_SECRET: dev-secret-change-in-production
+    depends_on:
+      - backend
+      - redis
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: alchemsim
+      POSTGRES_USER: alchemsim
+      POSTGRES_PASSWORD: alchemsim
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alchemsim"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - miniodata:/data
+
+volumes:
+  pgdata:
+  miniodata:
+  solver-data:
