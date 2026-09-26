@@ -27,7 +27,8 @@ Options utiles :
 | `--delay S` | pause entre deux pages, 3 s par défaut |
 | `--dump-json F` | écrit le relevé brut, rejouable avec `--from-json` |
 | `--from-json F` | régénère le classeur sans repasser sur le site |
-| `--from-html F` | relit une page enregistrée depuis le navigateur (Cmd+S) |
+| `--from-html F` | relit une page enregistrée depuis le navigateur (Cmd+S), scripts JSON et DOM |
+| `--from-text F` | relit un simple copier-coller de la page de résultats |
 | `--no-filter` | garde les annonces hors critères de prix ou de surface |
 
 ## Ce que produit le classeur
@@ -47,6 +48,10 @@ Options utiles :
 2. **`__NEXT_DATA__`** : les données injectées dans la page au chargement.
 3. **DOM rendu** : repli par lecture des cartes de résultats, prix, surface,
    pièces et commune extraits du texte.
+
+Sans accès au site, `--from-html` et `--from-text` reprennent le même pipeline sur
+une page enregistrée ou un copier-coller : les prix de crédit, les encarts et les
+bandeaux publicitaires sont écartés.
 
 Les trois sources sont fusionnées et dédupliquées (par identifiant, puis par lien,
 puis par prix + surface + commune).

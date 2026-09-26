@@ -111,6 +111,40 @@ def test_browser_pipeline():
     return ok
 
 
+TEXT_DUMP = """Trier par : pertinence
+Maison 8 pièces 232 m²
+Mundolsheim (67450)
+789 000 €
+Agence Alpha
+Estimez votre bien gratuitement
+Maison neuve 6 pièces 168 m²
+Oberhausbergen (67205)
+612 000 €
+Simulez votre prêt à partir de 1 850 € par mois
+Maison de ville 7 pièces 4 chambres 178 m²
+67380 Lingolsheim
+675 000 €
+Honoraires 4 000 € à la charge du vendeur
+"""
+
+
+def test_text_dump():
+    """Copier-coller de la page : segmentation, bruit publicitaire, crédit."""
+    found = extract.parse_text_dump(TEXT_DUMP)
+    ok = check("3 annonces depuis le texte", len(found) == 3, [f.get("prix") for f in found])
+    if len(found) != 3:
+        return False
+    a, b, c = found
+    ok &= check("prix de vente, pas mensualité", [r["prix"] for r in found] == [789000, 612000, 675000],
+                [r["prix"] for r in found])
+    ok &= check("ville format 'Ville (CP)'", (a["ville"], a["cp"]) == ("Mundolsheim", "67450"), a)
+    ok &= check("ville format 'CP Ville'", (c["ville"], c["cp"]) == ("Lingolsheim", "67380"), c)
+    ok &= check("titre de l'annonce", a["titre"] == "Maison 8 pièces 232 m²", a["titre"])
+    ok &= check("pas de débordement de bloc", b.get("chambres") is None, b)
+    ok &= check("surfaces", [r["surface"] for r in found] == [232, 168, 178], [r["surface"] for r in found])
+    return ok
+
+
 def test_workbook():
     records = [
         {"titre": "Maison A", "ville": "Mundolsheim", "cp": "67450", "prix": 789000, "surface": 232,
@@ -143,6 +177,7 @@ if __name__ == "__main__":
         ("extraction JSON", test_json_harvest()),
         ("dédup / filtre", test_dedupe_and_filter()),
         ("pipeline navigateur", test_browser_pipeline()),
+        ("copier-coller texte", test_text_dump()),
         ("classeur Excel", test_workbook()),
     ]
     failed = [name for name, ok in results if not ok]

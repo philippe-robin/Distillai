@@ -46,7 +46,17 @@ _PRICE_TXT_RE = re.compile(r"([\d][\d\s  .,]*)\s*(?:€|eur)", re.I)
 _SPACE_TXT_RE = re.compile(r"([\d][\d\s  .,]*)\s*m(?:²|2|²)", re.I)
 _ROOMS_TXT_RE = re.compile(r"(\d+)\s*(?:pi[eè]ces?|p\.\b|pcs?\b)", re.I)
 _BEDROOMS_TXT_RE = re.compile(r"(\d+)\s*(?:chambres?|ch\.\b)", re.I)
-_ZIP_CITY_RE = re.compile(r"\b(\d{5})\b[\s,-]*([A-Za-zÀ-ÿ'’\- ]{2,40})")
+_CITY_TOKEN = r"[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’\-]*(?:[ '’\-][A-Za-zÀ-ÿ][A-Za-zÀ-ÿ'’\-]*){0,4}"
+_ZIP_CITY_RE = re.compile(r"\b(\d{5})\b[\s,-]+(" + _CITY_TOKEN + r")")
+_CITY_ZIP_RE = re.compile(r"(" + _CITY_TOKEN + r")\s*[(\[]\s*(\d{5})\s*[)\]]")
+# Lignes de simulation de credit ou de frais : leur montant n'est pas un prix de vente.
+_CREDIT_LINE_RE = re.compile(
+    r"(par\s*mois|/\s*mois|mensualit|cr[ée]dit|emprunt|pr[êe]t|assurance|honoraires|"
+    r"frais\s+d|charges|taxe|estimation|budget)",
+    re.I,
+)
+# Mots qui ouvrent un intitule d'annonce.
+_TITLE_HINT_RE = re.compile(r"(maison|villa|appartement|duplex|loft|propri[ée]t[ée]|demeure|pavillon|m²|pi[eè]ce)", re.I)
 _DETAIL_HREF_RE = re.compile(r"/(?:classified|annonce|detail|vente)[-/]", re.I)
 
 
@@ -205,11 +215,68 @@ def parse_card_text(text: str) -> dict:
     bedrooms = _BEDROOMS_TXT_RE.search(text)
     if bedrooms:
         out["chambres"] = float(bedrooms.group(1))
-    zip_city = _ZIP_CITY_RE.search(text)
-    if zip_city:
-        out["cp"] = zip_city.group(1)
-        out["ville"] = zip_city.group(2).strip(" ,-")
+    city_zip = _CITY_ZIP_RE.search(text)
+    if city_zip:
+        out["ville"] = city_zip.group(1).strip(" ,-")
+        out["cp"] = city_zip.group(2)
+    else:
+        zip_city = _ZIP_CITY_RE.search(text)
+        if zip_city:
+            out["cp"] = zip_city.group(1)
+            out["ville"] = zip_city.group(2).strip(" ,-")
     return out
+
+
+MIN_SALE_PRICE = 10000  # en dessous, c'est une mensualite ou des frais, pas un bien
+
+
+def parse_text_dump(text: str) -> list[dict]:
+    """Extrait les annonces d'un copier-coller de la page de resultats.
+
+    Le texte colle n'a pas de structure : on decoupe sur les prix de vente. Un
+    bloc va de la fin du bloc precedent jusqu'a la ligne du prix incluse, ce qui
+    evite de happer le debut de l'annonce suivante. Les lignes de simulation de
+    credit et de frais sont ignorees, sinon leur montant ouvrirait un faux bloc.
+    """
+    lines = [l.strip() for l in text.replace("\u00a0", " ").replace("\u202f", " ").splitlines()]
+    found: list[dict] = []
+    start = 0
+    for index, line in enumerate(lines):
+        price_match = _PRICE_TXT_RE.search(line)
+        if not price_match or _CREDIT_LINE_RE.search(line):
+            continue
+        price = to_number(price_match.group(1))
+        if price is None or price < MIN_SALE_PRICE:
+            continue
+        block = [l for l in lines[start : index + 1] if l and not _CREDIT_LINE_RE.search(l)]
+        start = index + 1
+        parsed = parse_card_text("\n".join(block))
+        parsed["prix"] = price  # le prix du bloc est celui de sa derniere ligne
+        if parsed.get("surface") is None and parsed.get("pieces") is None:
+            continue
+        titre = next((l for l in block if _TITLE_HINT_RE.search(l) and not _PRICE_TXT_RE.search(l)), None)
+        if titre is None:
+            titre = next((l for l in block if len(l) > 8 and not _PRICE_TXT_RE.search(l)), None)
+        found.append(
+            {
+                "id": None,
+                "titre": titre[:180] if titre else None,
+                "ville": parsed.get("ville"),
+                "cp": parsed.get("cp"),
+                "prix": parsed.get("prix"),
+                "surface": parsed.get("surface"),
+                "terrain": None,
+                "pieces": parsed.get("pieces"),
+                "chambres": parsed.get("chambres"),
+                "dpe": None,
+                "type_bien": None,
+                "type_projet": None,
+                "agence": None,
+                "url": None,
+                "source": "texte",
+            }
+        )
+    return found
 
 
 def harvest_cards(cards: Iterable[dict]) -> list[dict]:

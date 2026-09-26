@@ -297,8 +297,34 @@ def _harvest_page(page) -> list[dict]:
     return found
 
 
-def load_offline(from_json: str | None, from_html: str | None) -> list[dict]:
-    """Relecture sans reseau : dump JSON du script, ou page HTML enregistree."""
+def harvest_local_file(path: str) -> list[dict]:
+    """Ouvre une page enregistree dans Chromium, hors ligne, et la depouille."""
+    from playwright.sync_api import sync_playwright
+
+    with sync_playwright() as pw:
+        try:
+            browser = pw.chromium.launch(headless=True)
+        except Exception:
+            browser = pw.chromium.launch(headless=True, executable_path=CHROMIUM_FALLBACK)
+        page = browser.new_page()
+        # La page enregistree reference des ressources distantes : on coupe tout
+        # ce qui n'est pas local pour ne pas dependre du reseau.
+        page.route("**/*", lambda route: route.abort() if not route.request.url.startswith("file:") else route.continue_())
+        try:
+            page.goto(Path(path).resolve().as_uri(), wait_until="domcontentloaded", timeout=30000)
+            page.wait_for_timeout(1500)
+            records = _harvest_page(page)
+        finally:
+            browser.close()
+    return records
+
+
+def load_offline(
+    from_json: str | None = None,
+    from_html: str | None = None,
+    from_text: str | None = None,
+) -> list[dict]:
+    """Relecture sans reseau : dump JSON, page enregistree, ou texte colle."""
     records: list[dict] = []
     if from_json:
         payload = json.loads(Path(from_json).read_text(encoding="utf-8"))
@@ -313,6 +339,13 @@ def load_offline(from_json: str | None, from_html: str | None) -> list[dict]:
                 records.extend(extract.harvest_json(json.loads(blob), source="html_json"))
             except ValueError:
                 continue
+        try:
+            records.extend(harvest_local_file(from_html))
+        except Exception as exc:  # pas de navigateur : les scripts JSON suffisent souvent
+            print(f"Lecture DOM impossible ({exc}); seules les données JSON de la page sont reprises.", file=sys.stderr)
+    if from_text:
+        raw = Path(from_text).read_text(encoding="utf-8", errors="ignore")
+        records.extend(extract.parse_text_dump(raw))
     return extract.dedupe(records)
 
 
@@ -326,17 +359,18 @@ def main() -> int:
     parser.add_argument("--dump-json", help="Ecrire le relevé brut dans ce fichier JSON")
     parser.add_argument("--from-json", help="Relire un relevé brut au lieu de scraper")
     parser.add_argument("--from-html", help="Relire une page HTML enregistrée au lieu de scraper")
+    parser.add_argument("--from-text", help="Relire un copier-coller de la page (fichier texte)")
     parser.add_argument("--no-filter", action="store_true", help="Ne pas re-filtrer sur les critères de l'URL")
     args = parser.parse_args()
 
-    if not args.url and not (args.from_json or args.from_html):
-        parser.error("indiquer --url, ou --from-json / --from-html")
+    if not args.url and not (args.from_json or args.from_html or args.from_text):
+        parser.error("indiquer --url, ou --from-json / --from-html / --from-text")
 
     criteria = decode_criteria(args.url) if args.url else {}
     notes: list[str] = []
 
-    if args.from_json or args.from_html:
-        records = load_offline(args.from_json, args.from_html)
+    if args.from_json or args.from_html or args.from_text:
+        records = load_offline(args.from_json, args.from_html, args.from_text)
         log = [f"Lecture hors ligne : {len(records)} annonce(s)"]
     else:
         records, log = scrape(
