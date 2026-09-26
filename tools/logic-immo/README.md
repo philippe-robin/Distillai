@@ -74,4 +74,5 @@ python tests/test_extract.py
 
 Couvre les parseurs de prix et de surface, l'extraction JSON, la déduplication
 inter-sources, le filtrage sur critères, le pipeline navigateur sur une page de
-test locale et la structure du classeur.
+test locale, la lecture d'un copier-coller, la structure du classeur et
+l'évaluation de la formule prix/m² (moteur `pip install formulas`, facultatif).

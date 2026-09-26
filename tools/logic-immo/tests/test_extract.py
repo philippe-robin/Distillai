@@ -171,6 +171,47 @@ def test_workbook():
     return ok
 
 
+def test_formula_values():
+    """La formule prix/m² pointe sur les bonnes colonnes et s'évalue juste.
+
+    LibreOffice n'étant pas exploitable partout, l'évaluation passe par le
+    moteur Python `formulas` quand il est disponible.
+    """
+    from openpyxl import load_workbook
+
+    out = Path(tempfile.gettempdir()) / "test_biens.xlsx"
+    if not out.exists():
+        test_workbook()
+    ws = load_workbook(out)["Biens"]
+    headers = {c.value: c.column_letter for c in ws[1]}
+    formula = str(ws["J2"].value)
+    ok = check(
+        "formule = Prix ÷ Surface",
+        f"{headers['Prix (€)']}2/{headers['Surface (m²)']}2" in formula,
+        formula,
+    )
+    try:
+        import warnings
+
+        warnings.filterwarnings("ignore")
+        import formulas
+    except ImportError:
+        print("[SKIP] moteur `formulas` non installé, évaluation non vérifiée")
+        return ok
+    solution = formulas.ExcelModel().loads(str(out)).finish().calculate()
+    values = {}
+    for key, cell in solution.items():
+        if "!J2" in key or "!J3" in key:
+            try:
+                values[key[-2:]] = round(float(cell.value[0, 0]), 2)
+            except Exception:
+                pass
+    ok &= check("J2 = 789000/232", values.get("J2") == 3400.86, values)
+    ok &= check("J3 = 612000/168", values.get("J3") == 3642.86, values)
+    ok &= check("aucune erreur de formule", not any(isinstance(v, str) and v.startswith("#") for v in values.values()))
+    return ok
+
+
 if __name__ == "__main__":
     results = [
         ("parseurs", test_parsers()),
@@ -179,6 +220,7 @@ if __name__ == "__main__":
         ("pipeline navigateur", test_browser_pipeline()),
         ("copier-coller texte", test_text_dump()),
         ("classeur Excel", test_workbook()),
+        ("formules évaluées", test_formula_values()),
     ]
     failed = [name for name, ok in results if not ok]
     print("\n" + ("Tous les tests passent." if not failed else f"Échecs : {', '.join(failed)}"))
