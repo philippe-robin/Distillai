@@ -96,7 +96,7 @@ def _decode_locations(raw: str) -> str:
     duration, mode = data.get("duration"), data.get("mode")
     if duration and mode:
         modes = {"Car": "en voiture", "Walk": "à pied", "PublicTransport": "en transports"}
-        return f"{places} — rayon {duration} min {modes.get(mode, mode)}"
+        return f"{places}, rayon {duration} min {modes.get(mode, mode)}"
     return places or raw
 
 
@@ -345,7 +345,10 @@ def load_offline(
             print(f"Lecture DOM impossible ({exc}); seules les données JSON de la page sont reprises.", file=sys.stderr)
     if from_text:
         raw = Path(from_text).read_text(encoding="utf-8", errors="ignore")
-        records.extend(extract.parse_text_dump(raw))
+        parsed = extract.parse_results_paste(raw)
+        if not parsed:  # mise en page inattendue : decoupage generique sur les prix
+            parsed = extract.parse_text_dump(raw)
+        records.extend(parsed)
     return extract.dedupe(records)
 
 
@@ -361,13 +364,17 @@ def main() -> int:
     parser.add_argument("--from-html", help="Relire une page HTML enregistrée au lieu de scraper")
     parser.add_argument("--from-text", help="Relire un copier-coller de la page (fichier texte)")
     parser.add_argument("--no-filter", action="store_true", help="Ne pas re-filtrer sur les critères de l'URL")
+    parser.add_argument("--zone", help="Libellé lisible de la zone de recherche")
+    parser.add_argument("--note", action="append", default=[], help="Note ajoutée à la feuille Critères")
     args = parser.parse_args()
 
     if not args.url and not (args.from_json or args.from_html or args.from_text):
         parser.error("indiquer --url, ou --from-json / --from-html / --from-text")
 
     criteria = decode_criteria(args.url) if args.url else {}
-    notes: list[str] = []
+    if args.zone:
+        criteria["zone"] = args.zone
+    notes: list[str] = list(args.note)
 
     if args.from_json or args.from_html or args.from_text:
         records = load_offline(args.from_json, args.from_html, args.from_text)
@@ -389,6 +396,20 @@ def main() -> int:
                 f"{total - len(records)} annonce(s) hors critères de prix ou de surface ont été écartées "
                 "(le site élargit parfois la recherche)."
             )
+
+    extract.flag_duplicates(records)
+    groupes = {r["doublon"] for r in records if r.get("doublon")}
+    if groupes:
+        notes.append(
+            f"{len(groupes)} bien(s) semblent diffusés par plusieurs agences : colonne Doublon, "
+            "même prix et même commune, surface à 2 % près. Ils sont conservés tels quels, "
+            "leurs caractéristiques publiées différant d'une annonce à l'autre."
+        )
+    ecarts = extract.check_price_per_sqm(records)
+    if ecarts:
+        notes.append("Écart entre le prix au m² recalculé et celui affiché : " + " ; ".join(ecarts))
+    elif any(r.get("prix_m2_site") for r in records):
+        notes.append("Prix au m² recalculé conforme à celui affiché par le site sur toutes les annonces vérifiables.")
 
     for line in log:
         print(line, file=sys.stderr)

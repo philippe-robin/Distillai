@@ -332,8 +332,16 @@ def _keys_for(rec: dict) -> list[tuple]:
     if url:
         keys.append(("url", str(url).split("?")[0].split("#")[0].rstrip("/").lower()))
     if not keys:
+        # Sans identifiant ni lien, l'annonceur fait partie de l'identite : un
+        # meme bien confie a deux agences donne deux annonces, pas un doublon.
         keys.append(
-            ("fuzzy", rec.get("prix"), rec.get("surface"), (rec.get("ville") or "").strip().lower())
+            (
+                "fuzzy",
+                rec.get("prix"),
+                rec.get("surface"),
+                (rec.get("ville") or "").strip().lower(),
+                (rec.get("agence") or "").strip().lower(),
+            )
         )
     return keys
 
@@ -386,3 +394,172 @@ def matches_criteria(rec: dict, criteria: dict) -> bool:
         if high is not None and value > float(high):
             return False
     return True
+
+
+# --- Lecture d'un copier-coller de la page de resultats Logic-Immo -----------
+#
+# Chaque annonce y apparait deux fois : une ligne de resume qui porte toutes les
+# caracteristiques, puis un bloc detaille qui porte le DPE, le prix au m2
+# affiche, la localisation separee par une virgule et le nom de l'annonceur.
+# On segmente sur les lignes de resume et on complete avec le bloc qui suit.
+
+_SUMMARY_RE = re.compile(
+    r"^(?P<bien>Maison|Villa|Appartement|Propri[ée]t[ée]|Chalet|Loft|Duplex|Immeuble|Ferme)\s+à vendre\b(?P<reste>.*)$"
+)
+_PRICE_ANY_RE = re.compile(r"(?P<masque>-\s*de\s*)?(?P<montant>\d[\d\s  .,]*)\s*(?P<millions>M)?\s*€")
+_PER_SQM_RE = re.compile(r"([\d\s  .,]+)\s*€\s*/\s*m²")
+_DPE_RE = re.compile(r"^[A-G]$")
+_LOCATION_RE = re.compile(r"^(?:(?P<secteur>.+),\s*)?(?P<ville>[^,()]+?)\s*\((?P<cp>\d{5})\)$")
+_ROOMS_ONLY_RE = re.compile(r"(\d+)\s*pi[eè]ces?")
+_BEDROOMS_ONLY_RE = re.compile(r"(\d+)\s*chambres?")
+_LAND_RE = re.compile(r"([\d\s  .,]+)\s*m²\s*de\s*terrain")
+_LIVING_RE = re.compile(r"([\d\s  .,]+)\s*m²(?!\s*de\s*terrain)")
+_BADGES = {
+    "exclusivité", "nouveau", "consulté", "à voir sur lux residence",
+    "simuler mon crédit immobilier", "sélection", "liste", "carte",
+}
+
+
+def _clean_agency(line: str) -> str:
+    return re.sub(r"\s{2,}", " ", line).strip()
+
+
+def parse_results_paste(text: str) -> list[dict]:
+    """Depouille un copier-coller de la liste de resultats."""
+    lines = [l.strip() for l in text.replace(" ", " ").replace(" ", " ").splitlines()]
+    starts = [i for i, l in enumerate(lines) if _SUMMARY_RE.match(l) and "€" in l and "m²" in l]
+    records: list[dict] = []
+
+    for position, index in enumerate(starts):
+        end = starts[position + 1] if position + 1 < len(starts) else len(lines)
+        segment = lines[index:end]
+        summary = _SUMMARY_RE.match(lines[index])
+        rest = summary.group("reste")
+
+        price_match = _PRICE_ANY_RE.search(rest)
+        prix = None
+        prix_mention = None
+        if price_match:
+            if price_match.group("masque"):  # "- de 1.1M €" : fourchette, pas un prix
+                prix_mention = price_match.group(0).strip()
+            else:
+                prix = to_number(price_match.group("montant"))
+                if price_match.group("millions"):
+                    prix = prix * 1_000_000 if prix and prix < 1000 else prix
+            mention = rest[: price_match.start()].strip(" -–—")
+            after = rest[price_match.end():]
+        else:
+            mention, after = "", rest
+
+        pieces = _ROOMS_ONLY_RE.search(after)
+        chambres = _BEDROOMS_ONLY_RE.search(after)
+        terrain = _LAND_RE.search(after)
+        living_zone = after[: terrain.start()] if terrain else after
+        surface = _LIVING_RE.search(living_zone)
+
+        secteur = ville = cp = dpe = agence = None
+        prix_m2_site = None
+        for line in segment:
+            if dpe is None and _DPE_RE.match(line):
+                dpe = line
+            if prix_m2_site is None:
+                per_sqm = _PER_SQM_RE.search(line)
+                if per_sqm:
+                    prix_m2_site = to_number(per_sqm.group(1))
+            location = _LOCATION_RE.match(line)
+            if location and ville is None:
+                secteur = (location.group("secteur") or "").strip() or None
+                ville = location.group("ville").strip()
+                cp = location.group("cp")
+                for candidate in segment[segment.index(line) + 1:]:
+                    if not candidate or candidate.lower() in _BADGES or candidate == "·":
+                        continue
+                    agence = _clean_agency(candidate)
+                    break
+
+        remarques = []
+        if mention:
+            remarques.append(mention)
+        if prix_mention:
+            remarques.append(f"Prix non communiqué, annonce affichée « {prix_mention} »")
+
+        records.append(
+            {
+                "id": None,
+                "titre": None,
+                "type_bien": summary.group("bien"),
+                "mention": " · ".join(remarques) or None,
+                "secteur": secteur,
+                "ville": ville,
+                "cp": cp,
+                "prix": prix,
+                "prix_mention": prix_mention,
+                "surface": to_number(surface.group(1)) if surface else None,
+                "terrain": to_number(terrain.group(1)) if terrain else None,
+                "pieces": float(pieces.group(1)) if pieces else None,
+                "chambres": float(chambres.group(1)) if chambres else None,
+                "dpe": dpe,
+                "prix_m2_site": prix_m2_site,
+                "type_projet": "Neuf" if mention and "occupation" in mention.lower() else None,
+                "agence": agence,
+                "url": None,
+                "source": "collage",
+            }
+        )
+    return records
+
+
+def check_price_per_sqm(records: Iterable[dict], tolerance: float = 0.015) -> list[str]:
+    """Compare le prix au m2 recalcule a celui affiche par le site."""
+    alerts = []
+    for rec in records:
+        shown, prix, surface = rec.get("prix_m2_site"), rec.get("prix"), rec.get("surface")
+        if not (shown and prix and surface):
+            continue
+        computed = prix / surface
+        if abs(computed - shown) / shown > tolerance:
+            alerts.append(
+                f"{rec.get('ville')} {prix:.0f} € / {surface} m² : "
+                f"{computed:.0f} €/m² calculé contre {shown:.0f} €/m² affiché"
+            )
+    return alerts
+
+
+def flag_duplicates(records: list[dict], tolerance: float = 0.02) -> list[dict]:
+    """Marque les annonces qui portent probablement sur le meme bien.
+
+    Meme prix et meme commune, surface a 2 % pres : typiquement un bien confie a
+    plusieurs agences. On les signale sans les fusionner, leurs caracteristiques
+    publiees pouvant differer.
+    """
+    groups: list[list[int]] = []
+    for i, rec in enumerate(records):
+        if not rec.get("prix") or not rec.get("surface"):
+            continue
+        placed = False
+        for group in groups:
+            ref = records[group[0]]
+            same_price = ref.get("prix") == rec.get("prix")
+            same_city = (ref.get("ville") or "").lower() == (rec.get("ville") or "").lower()
+            close_area = abs(ref["surface"] - rec["surface"]) / ref["surface"] <= tolerance
+            # Deux terrains nettement differents : deux biens differents.
+            land_ref, land_rec = ref.get("terrain"), rec.get("terrain")
+            same_land = (
+                True
+                if not land_ref or not land_rec
+                else abs(land_ref - land_rec) / land_ref <= 0.05
+            )
+            if same_price and same_city and close_area and same_land:
+                group.append(i)
+                placed = True
+                break
+        if not placed:
+            groups.append([i])
+    label = 0
+    for group in groups:
+        if len(group) < 2:
+            continue
+        label += 1
+        for i in group:
+            records[i]["doublon"] = f"D{label}"
+    return records

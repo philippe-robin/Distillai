@@ -75,6 +75,16 @@ def test_dedupe_and_filter():
     ok &= check("dédup JSON + DOM", len(cross) == 1, cross)
     ok &= check("fusion inter-sources", cross[0].get("agence") == "Alpha" and cross[0].get("dpe") == "C", cross)
     ok &= check("fusion des champs", deduped[0]["agence"] == "Comble le vide")
+    two_agencies = extract.dedupe([
+        {"prix": 589900, "surface": 200, "ville": "Souffelweyersheim", "agence": "ETHIQU IMMO"},
+        {"prix": 589900, "surface": 200, "ville": "Souffelweyersheim", "agence": "Orpi Bartholdi"},
+    ])
+    ok &= check("deux agences, deux annonces", len(two_agencies) == 2, two_agencies)
+    same_agency = extract.dedupe([
+        {"prix": 589900, "surface": 200, "ville": "Souffelweyersheim", "agence": "ETHIQU IMMO"},
+        {"prix": 589900, "surface": 200, "ville": "Souffelweyersheim", "agence": "ETHIQU IMMO", "dpe": "A"},
+    ])
+    ok &= check("même agence, un seul enregistrement", len(same_agency) == 1, same_agency)
     criteria = {"priceMin": 550000, "priceMax": 800000, "spaceMin": 150, "spaceMax": 250}
     ok &= check("dans critères", extract.matches_criteria({"prix": 700000, "surface": 200}, criteria))
     ok &= check("prix trop haut", not extract.matches_criteria({"prix": 900000, "surface": 200}, criteria))
@@ -147,26 +157,32 @@ def test_text_dump():
 
 def test_workbook():
     records = [
-        {"titre": "Maison A", "ville": "Mundolsheim", "cp": "67450", "prix": 789000, "surface": 232,
-         "terrain": 812, "pieces": 8, "chambres": 5, "dpe": "B", "type_projet": "Ancien",
+        {"titre": "Maison A", "type_bien": "Maison", "ville": "Mundolsheim", "cp": "67450", "prix": 789000,
+         "surface": 232, "terrain": 812, "pieces": 8, "chambres": 5, "dpe": "B", "type_projet": "Ancien",
          "agence": "Agence Alpha", "url": "https://www.logic-immo.com/a"},
-        {"titre": "Maison B", "ville": "Oberhausbergen", "cp": "67205", "prix": 612000, "surface": 168,
-         "pieces": 6, "chambres": 4, "type_projet": "Neuf", "agence": "Beta", "url": None},
+        {"titre": "Maison B", "type_bien": "Maison", "ville": "Oberhausbergen", "cp": "67205", "prix": 612000,
+         "surface": 168, "pieces": 6, "chambres": 4, "type_projet": "Neuf", "agence": "Beta", "url": None},
+        {"titre": "Sans prix", "type_bien": "Villa", "ville": "Ostwald", "cp": "67540", "prix": None,
+         "surface": 170, "pieces": 6, "agence": "Gamma", "mention": "Prix non communiqué"},
     ]
     out = Path(tempfile.gettempdir()) / "test_biens.xlsx"
     write_workbook(records, str(out), criteria={"priceMin": 550000, "zone": "Strasbourg"}, source_url="https://x")
     from openpyxl import load_workbook
 
-    wb = load_workbook(out)
-    ws = wb["Biens"]
-    ok = check("feuilles", wb.sheetnames == ["Biens", "Critères"], wb.sheetnames)
-    ok &= check("2 lignes", ws.max_row == 3, ws.max_row)
-    # A : 789000/232 = 3401 €/m² ; B : 612000/168 = 3643 €/m² -> A en premier.
-    ok &= check("tri prix/m² croissant", ws["B2"].value == "Maison A", ws["B2"].value)
-    ok &= check("formule prix/m²", str(ws["J2"].value).startswith("=IFERROR("), ws["J2"].value)
+    ws = load_workbook(out)["Biens"]
+    head = {c.value: c.column_letter for c in ws[1]}
+    ok = check("feuilles", load_workbook(out).sheetnames == ["Biens", "Critères"])
+    ok &= check("3 lignes", ws.max_row == 4, ws.max_row)
+    # A : 3401 €/m², B : 3643 €/m², la troisième sans prix passe en fin de tri.
+    ok &= check("tri prix/m² croissant", ws[f"{head['Titre']}2"].value == "Maison A", ws[f"{head['Titre']}2"].value)
+    ok &= check("sans prix en dernier", ws[f"{head['Titre']}4"].value == "Sans prix", ws[f"{head['Titre']}4"].value)
+    ok &= check("formule prix/m²", str(ws[f"{head['Prix/m² (€)']}2"].value).startswith("=IFERROR("))
+    ok &= check("pas de formule sans prix", ws[f"{head['Prix/m² (€)']}4"].value is None,
+                ws[f"{head['Prix/m² (€)']}4"].value)
+    ok &= check("colonne vide retirée", "Doublon" not in head, list(head))
+    ok &= check("colonne remplie gardée", "Remarque" in head and "Agence" in head, list(head))
     ok &= check("filtres actifs", ws.auto_filter.ref is not None)
     ok &= check("volets figés", ws.freeze_panes == "B2")
-    ok &= check("URL vide tolérée", ws["N3"].value is None or ws["N3"].value == "")
     print(f"       classeur de test : {out}")
     return ok
 
@@ -183,13 +199,11 @@ def test_formula_values():
     if not out.exists():
         test_workbook()
     ws = load_workbook(out)["Biens"]
-    headers = {c.value: c.column_letter for c in ws[1]}
-    formula = str(ws["J2"].value)
-    ok = check(
-        "formule = Prix ÷ Surface",
-        f"{headers['Prix (€)']}2/{headers['Surface (m²)']}2" in formula,
-        formula,
-    )
+    head = {c.value: c.column_letter for c in ws[1]}
+    target = head["Prix/m² (€)"]
+    formula = str(ws[f"{target}2"].value)
+    ok = check("formule = Prix ÷ Surface",
+               f"{head['Prix (€)']}2/{head['Surface (m²)']}2" in formula, formula)
     try:
         import warnings
 
@@ -201,14 +215,16 @@ def test_formula_values():
     solution = formulas.ExcelModel().loads(str(out)).finish().calculate()
     values = {}
     for key, cell in solution.items():
-        if "!J2" in key or "!J3" in key:
-            try:
-                values[key[-2:]] = round(float(cell.value[0, 0]), 2)
-            except Exception:
-                pass
-    ok &= check("J2 = 789000/232", values.get("J2") == 3400.86, values)
-    ok &= check("J3 = 612000/168", values.get("J3") == 3642.86, values)
-    ok &= check("aucune erreur de formule", not any(isinstance(v, str) and v.startswith("#") for v in values.values()))
+        for row in (2, 3):
+            if key.upper().endswith(f"!{target}{row}"):
+                try:
+                    values[row] = round(float(cell.value[0, 0]), 2)
+                except Exception:
+                    values[row] = str(cell.value)
+    ok &= check("ligne 2 = 789000/232", values.get(2) == 3400.86, values)
+    ok &= check("ligne 3 = 612000/168", values.get(3) == 3642.86, values)
+    ok &= check("aucune erreur de formule",
+                not any(isinstance(v, str) and v.startswith("#") for v in values.values()), values)
     return ok
 
 

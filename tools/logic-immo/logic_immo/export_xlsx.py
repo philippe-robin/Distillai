@@ -14,7 +14,8 @@ FONT = "Arial"
 COLUMNS: list[tuple[str, str, int]] = [
     # (cle interne, en-tete, largeur)
     ("rang", "N°", 5),
-    ("titre", "Titre", 46),
+    ("type_bien", "Bien", 10),
+    ("secteur", "Secteur", 26),
     ("ville", "Ville", 22),
     ("cp", "CP", 8),
     ("prix", "Prix (€)", 13),
@@ -23,12 +24,17 @@ COLUMNS: list[tuple[str, str, int]] = [
     ("pieces", "Pièces", 8),
     ("chambres", "Chambres", 10),
     ("prix_m2", "Prix/m² (€)", 12),
-    ("type_projet", "Neuf / Ancien", 14),
     ("dpe", "DPE", 6),
-    ("agence", "Agence", 28),
-    ("url", "Lien", 46),
+    ("type_projet", "Neuf / Ancien", 14),
+    ("agence", "Agence", 34),
+    ("doublon", "Doublon", 9),
+    ("mention", "Remarque", 30),
+    ("titre", "Titre", 40),
+    ("url", "Lien", 40),
     ("releve", "Relevé le", 12),
 ]
+# Colonnes toujours presentes, meme vides.
+REQUIRED = {"rang", "ville", "prix", "surface", "prix_m2", "releve"}
 
 HEADER_FILL = PatternFill("solid", fgColor="1F3864")
 HEADER_FONT = Font(name=FONT, size=10, bold=True, color="FFFFFF")
@@ -55,12 +61,16 @@ def write_workbook(
     criteria = criteria or {}
     releve = datetime.now().strftime("%d/%m/%Y")
     rows = sorted(records, key=_sort_key)
+    columns = [
+        c for c in COLUMNS
+        if c[0] in REQUIRED or any(r.get(c[0]) not in (None, "") for r in rows)
+    ]
 
     wb = Workbook()
     ws = wb.active
     ws.title = "Biens"
 
-    for idx, (_key, header, width) in enumerate(COLUMNS, start=1):
+    for idx, (_key, header, width) in enumerate(columns, start=1):
         cell = ws.cell(row=1, column=idx, value=header)
         cell.font = HEADER_FONT
         cell.fill = HEADER_FILL
@@ -69,13 +79,17 @@ def write_workbook(
         ws.column_dimensions[get_column_letter(idx)].width = width
     ws.row_dimensions[1].height = 28
 
-    col = {key: get_column_letter(i) for i, (key, _h, _w) in enumerate(COLUMNS, start=1)}
+    col = {key: get_column_letter(i) for i, (key, _h, _w) in enumerate(columns, start=1)}
 
     for offset, rec in enumerate(rows):
         r = offset + 2
         values = {
             "rang": offset + 1,
             "titre": rec.get("titre"),
+            "type_bien": rec.get("type_bien"),
+            "secteur": rec.get("secteur"),
+            "doublon": rec.get("doublon"),
+            "mention": rec.get("mention"),
             "ville": rec.get("ville"),
             "cp": rec.get("cp"),
             "prix": rec.get("prix"),
@@ -84,15 +98,20 @@ def write_workbook(
             "pieces": rec.get("pieces"),
             "chambres": rec.get("chambres"),
             # Prix au m2 calcule dans le classeur : il suit toute correction manuelle.
-            "prix_m2": f"=IFERROR({col['prix']}{r}/{col['surface']}{r},\"\")",
+            # Formule seulement si prix et surface sont connus, sinon la case reste vide.
+            "prix_m2": (
+                f"=IFERROR({col['prix']}{r}/{col['surface']}{r},\"\")"
+                if rec.get("prix") and rec.get("surface")
+                else None
+            ),
             "type_projet": rec.get("type_projet"),
             "dpe": rec.get("dpe"),
             "agence": rec.get("agence"),
             "url": rec.get("url"),
             "releve": releve,
         }
-        for idx, (key, _header, _width) in enumerate(COLUMNS, start=1):
-            cell = ws.cell(row=r, column=idx, value=values[key])
+        for idx, (key, _header, _width) in enumerate(columns, start=1):
+            cell = ws.cell(row=r, column=idx, value=values.get(key))
             cell.font = CELL_FONT
             cell.border = BORDER
             if key in ("prix", "prix_m2"):
@@ -109,7 +128,7 @@ def write_workbook(
                 cell.font = LINK_FONT
 
     last_row = max(len(rows) + 1, 2)
-    ws.auto_filter.ref = f"A1:{get_column_letter(len(COLUMNS))}{last_row}"
+    ws.auto_filter.ref = f"A1:{get_column_letter(len(columns))}{last_row}"
     ws.freeze_panes = "B2"
 
     _write_criteria_sheet(wb, criteria, source_url, len(rows), releve, notes)
@@ -162,7 +181,7 @@ def _write_criteria_sheet(wb, criteria, source_url, count, releve, notes) -> Non
     row += 1
     default_notes = [
         "Données relevées automatiquement sur les pages de résultats Logic-Immo, telles que publiées par les annonceurs.",
-        "Prix/m² : calculé dans la feuille Biens (prix ÷ surface habitable), pas fourni par le site.",
+        "Prix/m² : formule de la feuille Biens (prix ÷ surface habitable), recalculée ici et non recopiée.",
         "Le classement par défaut est le prix au m² croissant. Les filtres Excel sont actifs sur l'en-tête.",
         "Une cellule vide signifie que l'information n'était pas publiée dans l'annonce.",
     ]
