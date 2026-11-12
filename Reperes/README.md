@@ -1,5 +1,9 @@
 # Repères
 
+> **V1 = iPhone seul.** Ce README décrit le brouillon de code multiplateforme écrit
+> avant l'arbitrage. Le périmètre retenu est dans `SPEC.md` ; le retrait des branches
+> macOS est prévu à l'étape 1.
+
 App Mac et iPhone (une seule cible, un seul code) pour tenir une liste de lieux,
 les voir sur une carte Apple, et recevoir une notification quand on passe à
 proximité d'un lieu pas encore visité.
