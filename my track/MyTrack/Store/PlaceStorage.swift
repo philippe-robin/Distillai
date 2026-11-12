@@ -13,7 +13,7 @@ enum PlaceStorage {
     static var directory: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.temporaryDirectory
-        let dir = base.appendingPathComponent("Reperes", isDirectory: true)
+        let dir = base.appendingPathComponent("MyTrack", isDirectory: true)
         if !FileManager.default.fileExists(atPath: dir.path) {
             try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         }
@@ -30,7 +30,7 @@ enum PlaceStorage {
         do {
             return try decoder.decode([Place].self, from: data)
         } catch {
-            NSLog("Repères: lecture de places.json impossible (%@)", String(describing: error))
+            NSLog("My Track: lecture de places.json impossible (%@)", String(describing: error))
             return []
         }
     }
@@ -40,7 +40,7 @@ enum PlaceStorage {
             let data = try encoder.encode(places)
             try data.write(to: placesURL, options: .atomic)
         } catch {
-            NSLog("Repères: écriture de places.json impossible (%@)", String(describing: error))
+            NSLog("My Track: écriture de places.json impossible (%@)", String(describing: error))
         }
     }
 

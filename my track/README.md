@@ -1,4 +1,4 @@
-# Repères
+# My Track
 
 > **V1 = iPhone seul.** Ce README décrit le brouillon de code multiplateforme écrit
 > avant l'arbitrage. Le périmètre retenu est dans `SPEC.md` ; le retrait des branches
@@ -31,7 +31,7 @@ proximité d'un lieu pas encore visité.
 
 ## Lancer sur Mac
 
-1. Ouvrir `Reperes.xcodeproj`.
+1. Ouvrir `MyTrack.xcodeproj`.
 2. Choisir la destination « My Mac », puis Run.
 3. Autoriser la localisation et les notifications à la première demande.
 
@@ -41,12 +41,12 @@ aucun compte développeur n'est nécessaire pour un usage local.
 ## Lancer sur iPhone
 
 1. Dans les réglages de la cible, onglet Signing & Capabilities, choisir votre
-   équipe. Changer `PRODUCT_BUNDLE_IDENTIFIER` si `com.philipperobin.reperes`
+   équipe. Changer `PRODUCT_BUNDLE_IDENTIFIER` si `com.philipperobin.mytrack`
    est déjà pris.
 2. Choisir l'iPhone comme destination, puis Run.
 3. À la première demande, autoriser la localisation **Toujours** : avec
    « Lorsque l'app est active », aucune alerte n'arrive quand l'app est fermée.
-   Réglages > Repères > Position > Toujours si l'occasion a été manquée.
+   Réglages > My Track > Position > Toujours si l'occasion a été manquée.
 
 Aucun mode d'arrière-plan n'est requis : la surveillance de régions et les
 changements significatifs de position suffisent à faire relancer l'app par iOS.
@@ -81,8 +81,8 @@ changements significatifs de position suffisent à faire relancer l'app par iOS.
 ## Organisation du code
 
 ```
-Reperes/
-  ReperesApp.swift          point d'entrée, délégué iOS pour la relance en arrière-plan
+MyTrack/
+  MyTrackApp.swift          point d'entrée, délégué iOS pour la relance en arrière-plan
   Model/
     Place.swift             le lieu, décodage tolérant aux évolutions de schéma
     AppSettings.swift       réglages persistés
@@ -104,21 +104,21 @@ Reperes/
     SettingsScreen.swift    réglages, autorisations, diagnostic
 ```
 
-Les données sont dans `Application Support/Reperes/places.json`. Le chemin exact
+Les données sont dans `Application Support/MyTrack/places.json`. Le chemin exact
 est affiché dans Réglages, avec un bouton pour l'ouvrir dans le Finder.
 
 ## Si le projet refuse de s'ouvrir
 
 Le fichier `project.pbxproj` a été écrit à la main. En cas de refus :
 
-1. Xcode > File > New > Project > Multiplatform > App, nom `Reperes`.
-2. Supprimer les fichiers générés `ReperesApp.swift` et `ContentView.swift`.
+1. Xcode > File > New > Project > Multiplatform > App, nom `MyTrack`.
+2. Supprimer les fichiers générés `MyTrackApp.swift` et `ContentView.swift`.
 3. Glisser les dossiers `Model`, `Store`, `Services`, `Views`, `Support` et le
-   fichier `ReperesApp.swift` de ce dépôt dans le groupe du projet.
+   fichier `MyTrackApp.swift` de ce dépôt dans le groupe du projet.
 4. Dans les réglages de la cible : déploiement iOS 17 / macOS 14, et recopier
    les descriptions d'usage de la localisation (Info.plist) ainsi que
    l'entitlement de localisation pour le Mac depuis
-   `Reperes/Support/Reperes.entitlements`.
+   `MyTrack/Support/MyTrack.entitlements`.
 
 ## Pistes pour la suite
 

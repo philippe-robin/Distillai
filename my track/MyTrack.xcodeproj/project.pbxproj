@@ -7,11 +7,11 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		AA0000000000000000000004 /* Reperes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Reperes.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000004 /* MyTrack.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MyTrack.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		AA0000000000000000000005 /* Reperes */ = {isa = PBXFileSystemSynchronizedRootGroup; path = Reperes; sourceTree = "<group>"; };
+		AA0000000000000000000005 /* MyTrack */ = {isa = PBXFileSystemSynchronizedRootGroup; path = MyTrack; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -28,7 +28,7 @@
 		AA0000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
-				AA0000000000000000000005 /* Reperes */,
+				AA0000000000000000000005 /* MyTrack */,
 				AA0000000000000000000003 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -36,7 +36,7 @@
 		AA0000000000000000000003 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				AA0000000000000000000004 /* Reperes.app */,
+				AA0000000000000000000004 /* MyTrack.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -44,9 +44,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		AA0000000000000000000006 /* Reperes */ = {
+		AA0000000000000000000006 /* MyTrack */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = AA000000000000000000000B /* Build configuration list for PBXNativeTarget "Reperes" */;
+			buildConfigurationList = AA000000000000000000000B /* Build configuration list for PBXNativeTarget "MyTrack" */;
 			buildPhases = (
 				AA0000000000000000000007 /* Sources */,
 				AA0000000000000000000008 /* Frameworks */,
@@ -57,13 +57,13 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				AA0000000000000000000005 /* Reperes */,
+				AA0000000000000000000005 /* MyTrack */,
 			);
-			name = Reperes;
+			name = MyTrack;
 			packageProductDependencies = (
 			);
-			productName = Reperes;
-			productReference = AA0000000000000000000004 /* Reperes.app */;
+			productName = MyTrack;
+			productReference = AA0000000000000000000004 /* MyTrack.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -81,7 +81,7 @@
 					};
 				};
 			};
-			buildConfigurationList = AA000000000000000000000A /* Build configuration list for PBXProject "Reperes" */;
+			buildConfigurationList = AA000000000000000000000A /* Build configuration list for PBXProject "MyTrack" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -95,7 +95,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				AA0000000000000000000006 /* Reperes */,
+				AA0000000000000000000006 /* MyTrack */,
 			);
 		};
 /* End PBXProject section */
@@ -191,19 +191,19 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Reperes/Support/Reperes.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MyTrack/Support/MyTrack.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Repères";
+				INFOPLIST_KEY_CFBundleDisplayName = "My Track";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Repères vous signale les lieux de votre liste quand vous passez à proximité, y compris lorsque l'app est fermée.";
-				INFOPLIST_KEY_NSLocationUsageDescription = "Repères utilise votre position pour afficher et trier les lieux de votre liste.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Repères utilise votre position pour vous situer sur la carte et calculer la distance aux lieux de votre liste.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "My Track vous signale les lieux de votre liste quand vous passez à proximité, y compris lorsque l'app est fermée.";
+				INFOPLIST_KEY_NSLocationUsageDescription = "My Track utilise votre position pour afficher et trier les lieux de votre liste.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "My Track utilise votre position pour vous situer sur la carte et calculer la distance aux lieux de votre liste.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -216,7 +216,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.philipperobin.reperes;
+				PRODUCT_BUNDLE_IDENTIFIER = com.philipperobin.mytrack;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -229,19 +229,19 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = Reperes/Support/Reperes.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = MyTrack/Support/MyTrack.entitlements;
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_HARDENED_RUNTIME = YES;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Repères";
+				INFOPLIST_KEY_CFBundleDisplayName = "My Track";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "Repères vous signale les lieux de votre liste quand vous passez à proximité, y compris lorsque l'app est fermée.";
-				INFOPLIST_KEY_NSLocationUsageDescription = "Repères utilise votre position pour afficher et trier les lieux de votre liste.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Repères utilise votre position pour vous situer sur la carte et calculer la distance aux lieux de votre liste.";
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "My Track vous signale les lieux de votre liste quand vous passez à proximité, y compris lorsque l'app est fermée.";
+				INFOPLIST_KEY_NSLocationUsageDescription = "My Track utilise votre position pour afficher et trier les lieux de votre liste.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "My Track utilise votre position pour vous situer sur la carte et calculer la distance aux lieux de votre liste.";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -254,7 +254,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.philipperobin.reperes;
+				PRODUCT_BUNDLE_IDENTIFIER = com.philipperobin.mytrack;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -265,7 +265,7 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		AA000000000000000000000A /* Build configuration list for PBXProject "Reperes" */ = {
+		AA000000000000000000000A /* Build configuration list for PBXProject "MyTrack" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AA000000000000000000000C /* Debug */,
@@ -274,7 +274,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		AA000000000000000000000B /* Build configuration list for PBXNativeTarget "Reperes" */ = {
+		AA000000000000000000000B /* Build configuration list for PBXNativeTarget "MyTrack" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				AA000000000000000000000E /* Debug */,

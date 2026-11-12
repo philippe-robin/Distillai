@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct ReperesApp: App {
+struct MyTrackApp: App {
 
     #if os(iOS)
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate

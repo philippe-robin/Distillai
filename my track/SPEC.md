@@ -1,10 +1,10 @@
-# Spécification V1 — Repères
+# Spécification V1 — My Track
 ## App iPhone de lieux à visiter, avec alerte de proximité
 
 Document de cadrage, version 2, 12 novembre 2026.
 Cible V1 : **iPhone seul**, iOS 17 minimum. Le Mac est écarté de la V1 (motif en C3).
 
-Maquette interactive associée : `Reperes/prototype-iphone.html`.
+Maquette interactive associée : `MyTrack/prototype-iphone.html`.
 
 ---
 
@@ -231,7 +231,7 @@ de la scène Réglages macOS et des entitlements) est inclus dans l'étape 1.
 | D2 | Source de la liste initiale | saisie manuelle ; collage ; fichier existant | à préciser : si une liste existe déjà, son format conditionne l'étape 3 |
 | D3 | Statut des lieux | visité / à visiter ; plusieurs visites horodatées | binaire en V1 |
 | D4 | Distribution | usage personnel ; TestFlight ; App Store | usage personnel, compte gratuit |
-| D5 | Nom de l'app | Repères ou autre | provisoire, sans impact technique hors identifiant de bundle |
+| D5 | Nom de l'app | My Track ou autre | provisoire, sans impact technique hors identifiant de bundle |
 
 ---
 

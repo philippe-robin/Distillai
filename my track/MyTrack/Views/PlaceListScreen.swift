@@ -58,7 +58,7 @@ struct PlaceListScreen: View {
             isPresented: $showExporter,
             document: exportDocument,
             contentType: exportFormat.contentType,
-            defaultFilename: "reperes.\(exportFormat.fileExtension)"
+            defaultFilename: "mytrack.\(exportFormat.fileExtension)"
         ) { _ in
             exportDocument = nil
         }

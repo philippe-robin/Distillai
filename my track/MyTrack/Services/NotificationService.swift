@@ -82,7 +82,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
         )
         UNUserNotificationCenter.current().add(request) { error in
             if let error {
-                NSLog("Repères: notification impossible (%@)", error.localizedDescription)
+                NSLog("My Track: notification impossible (%@)", error.localizedDescription)
             }
         }
     }
@@ -90,7 +90,7 @@ final class NotificationService: NSObject, UNUserNotificationCenterDelegate {
     /// Notification de test, pour vérifier la chaîne d'autorisations.
     func sendTestNotification() {
         let content = UNMutableNotificationContent()
-        content.title = "Repères"
+        content.title = "My Track"
         content.body = "Les alertes de proximité fonctionnent."
         content.sound = .default
         let request = UNNotificationRequest(

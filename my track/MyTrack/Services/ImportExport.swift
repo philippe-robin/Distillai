@@ -293,7 +293,7 @@ enum Exporter {
     /// Écrit l'export dans un fichier temporaire partageable.
     static func writeFile(places: [Place], format: Format) -> URL? {
         let contents = data(for: places, format: format)
-        let name = "reperes-\(Int(Date().timeIntervalSince1970)).\(format.fileExtension)"
+        let name = "mytrack-\(Int(Date().timeIntervalSince1970)).\(format.fileExtension)"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         do {
             try contents.write(to: url, atomically: true, encoding: .utf8)
@@ -330,7 +330,7 @@ enum Exporter {
     private static func gpx(_ places: [Place]) -> String {
         var lines = [
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-            "<gpx version=\"1.1\" creator=\"Reperes\" xmlns=\"http://www.topografix.com/GPX/1/1\">"
+            "<gpx version=\"1.1\" creator=\"MyTrack\" xmlns=\"http://www.topografix.com/GPX/1/1\">"
         ]
         for place in places {
             lines.append("  <wpt lat=\"\(place.latitude)\" lon=\"\(place.longitude)\">")
